@@ -15,7 +15,7 @@ const categories = [
 const starterVendors = [
  {business_name:'Calabar Kitchen & More',category:'Food & Drinks',area:'Marian',description:'Local favorites, fresh soups and today’s specials.',is_open:true,verified:true,cover_image_url:'https://images.unsplash.com/photo-1547592180-85f173990554?auto=format&fit=crop&w=900&q=80'},
  {business_name:'Thread Culture',category:'Fashion',area:'State Housing',description:'Everyday looks and statement pieces, selected with care.',is_open:true,verified:false,cover_image_url:'https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&w=900&q=80'},
- {business_name:'Pocket Tech Calabar',category:'Gadgets',area:'Watt Market',description:'Accessories, smart essentials and helpful local support.',is_open:false,verified:true,cover_image_url:'https://images.unsplash.com/photo-151170 в?auto=format&fit=crop&w=900&q=80'.replace('151170 в','1511707171634-5f897ff02aa9')},
+ {business_name:'Pocket Tech Calabar',category:'Gadgets',area:'Watt Market',description:'Accessories, smart essentials and helpful local support.',is_open:false,verified:true,cover_image_url:'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?auto=format&fit=crop&w=900&q=80'},
  {business_name:'BrightSide Repairs',category:'Services',area:'Eight Miles',description:'Friendly home and device services from local professionals.',is_open:true,verified:false,cover_image_url:'https://images.unsplash.com/photo-1581578731548-c64695cc6952?auto=format&fit=crop&w=900&q=80'}
 ];
 const demoGroups = [
