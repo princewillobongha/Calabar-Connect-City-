@@ -83,12 +83,12 @@ async function get(path: string) {
     const {data:memberRows,error:membersError}=await supabase.from('group_members').select('user_id,role,status,joined_at').eq('group_id',groupId).eq('status','active');
     if(membersError) fail(membersError.message);
     const ids=[...new Set([...(posts||[]).map((p:any)=>p.author_id),...(memberRows||[]).map((m:any)=>m.user_id)])];
-    const {data:profiles,error:profilesError}=ids.length?await supabase.from('profiles').select('id,username,display_name,avatar_url,is_verified').in('id',ids):{data:[],error:null};
+    const {data:profiles,error:profilesError}=ids.length?await supabase.from('profiles').select('id,username,display_name,avatar_url,is_verified,verified_until').in('id',ids):{data:[],error:null};
     if(profilesError) fail(profilesError.message);
     const {data:{user:viewer}}=await supabase.auth.getUser();
     const isMember=!!viewer&&(memberRows||[]).some((m:any)=>m.user_id===viewer.id);
     const profileMap=new Map((profiles||[]).map((p:any)=>[p.id,p]));
-    return {data:{item:{...group,members:(memberRows||[]).length,is_member:isMember,is_owner:!!viewer&&group.owner_id===viewer.id,posts:(posts||[]).map((p:any)=>{const a:any=profileMap.get(p.author_id)||{};return {...p,author:a.display_name||a.username||'Calabar member',avatar_url:a.avatar_url||null,is_verified:!!a.is_verified};}),member_list:(memberRows||[]).map((m:any)=>({...m,profile:profileMap.get(m.user_id)||{}}))}}};
+    return {data:{item:{...group,members:(memberRows||[]).length,is_member:isMember,is_owner:!!viewer&&group.owner_id===viewer.id,posts:(posts||[]).map((p:any)=>{const a:any=profileMap.get(p.author_id)||{};return {...p,author:a.display_name||a.username||'Calabar member',avatar_url:a.avatar_url||null,is_verified:!!a.is_verified&&(!a.verified_until||new Date(a.verified_until).getTime()>Date.now())};}),member_list:(memberRows||[]).map((m:any)=>({...m,profile:profileMap.get(m.user_id)||{}}))}}};
   }
   if (path === '/api/groups') {
     const {data,error}=await supabase.from('community_groups').select('*').eq('visibility','public').order('created_at',{ascending:false});
@@ -118,7 +118,7 @@ async function get(path: string) {
     const {data:follow,error:followError}=await supabase.from('community_follows').select('follower_id').eq('follower_id',user.id).eq('followed_id',targetId).maybeSingle();
     if(followError) fail(followError.message);
     const [{count:followers},{count:following}]=await Promise.all([supabase.from('community_follows').select('*',{count:'exact',head:true}).eq('followed_id',targetId),supabase.from('community_follows').select('*',{count:'exact',head:true}).eq('follower_id',targetId)]);
-    const {data:ratings,error:ratingError}=await supabase.from('profile_ratings').select('rating,rater_id').eq('profile_id',targetId); if(ratingError)fail(ratingError.message); const ratingRows=ratings||[]; const ratingAverage=ratingRows.length?ratingRows.reduce((sum:number,r:any)=>sum+Number(r.rating),0)/ratingRows.length:0; const {count:orders}=await supabase.from('vendor_enquiries').select('*',{count:'exact',head:true}).eq('vendor_id', (await supabase.from('vendors').select('id').eq('owner_id',targetId).maybeSingle()).data?.id||'00000000-0000-0000-0000-000000000000');
+    const {data:ratings,error:ratingError}=await supabase.from('profile_ratings').select('rating,rater_id').eq('profile_id',targetId); if(ratingError)fail(ratingError.message); const ratingRows=ratings||[]; const ratingAverage=ratingRows.length?ratingRows.reduce((sum:number,r:any)=>sum+Number(r.rating),0)/ratingRows.length:0; const {data:targetVendor}=await supabase.from('vendors').select('id').eq('owner_id',targetId).maybeSingle(); const {data:targetListings}=targetVendor?await supabase.from('listings').select('order_count').eq('vendor_id',targetVendor.id):{data:[],error:null}; const orders=(targetListings||[]).reduce((sum:number,l:any)=>sum+Number(l.order_count||0),0);
     return {data:{item:{...data,is_verified:!!data.is_verified&&(!data.verified_until||new Date(data.verified_until).getTime()>Date.now()),rating_average:ratingAverage,rating_count:ratingRows.length,my_rating:ratingRows.find((r:any)=>r.rater_id===user.id)?.rating||0,order_count:orders||0,followers_count:followers||0,following_count:following||0,posts:(posts||[]).map((p:any)=>({...p,like_count:(postLikes||[]).filter((x:any)=>x.post_id===p.id).length,liked_by_me:(postLikes||[]).some((x:any)=>x.post_id===p.id&&x.user_id===user.id),share_count:(postShares||[]).filter((x:any)=>x.post_id===p.id).length,shared_by_me:(postShares||[]).some((x:any)=>x.post_id===p.id&&x.user_id===user.id)}))},is_following:!!follow}};
   }
   if (path === '/api/profile') {
@@ -137,14 +137,14 @@ async function get(path: string) {
     const {data,error}=await supabase.from('community_posts').select('*').order('created_at',{ascending:false}).limit(80);
     const rows=ensure(data,error);const ids=rows.map((p:any)=>p.author_id);const postIds=rows.map((p:any)=>p.id);
     const [{data:profiles,error:pe},{data:likes,error:le},{data:shares,error:se},{data:comments,error:ce},{data:{user:viewer}}]=await Promise.all([
-      ids.length?supabase.from('profiles').select('id,display_name,username,avatar_url,is_verified').in('id',[...new Set(ids)]):Promise.resolve({data:[],error:null}),
+      ids.length?supabase.from('profiles').select('id,display_name,username,avatar_url,is_verified,verified_until').in('id',[...new Set(ids)]):Promise.resolve({data:[],error:null}),
       postIds.length?supabase.from('community_post_reactions').select('post_id,user_id').in('post_id',postIds):Promise.resolve({data:[],error:null}),
       postIds.length?supabase.from('community_post_shares').select('post_id,user_id').in('post_id',postIds):Promise.resolve({data:[],error:null}),
       postIds.length?supabase.from('community_comments').select('post_id').in('post_id',postIds):Promise.resolve({data:[],error:null}),
       supabase.auth.getUser()
     ]);if(pe)fail(pe.message);if(le)fail(le.message);if(se)fail(se.message);if(ce)fail(ce.message);
     const pm=new Map((profiles||[]).map((p:any)=>[p.id,p]));
-    return {data:{items:rows.map((p:any)=>{const a:any=pm.get(p.author_id)||{};return {id:p.id,text:p.text,image_url:p.image_url||null,author:a.display_name||a.username||'Calabar Member',author_id:p.author_id,is_verified:!!a.is_verified,avatar_url:a.avatar_url||null,category:p.category,created_at:p.created_at,like_count:(likes||[]).filter((x:any)=>x.post_id===p.id).length,liked_by_me:!!viewer&&(likes||[]).some((x:any)=>x.post_id===p.id&&x.user_id===viewer.id),share_count:(shares||[]).filter((x:any)=>x.post_id===p.id).length,shared_by_me:!!viewer&&(shares||[]).some((x:any)=>x.post_id===p.id&&x.user_id===viewer.id),comment_count:(comments||[]).filter((x:any)=>x.post_id===p.id).length}})}};
+    return {data:{items:rows.map((p:any)=>{const a:any=pm.get(p.author_id)||{};return {id:p.id,text:p.text,image_url:p.image_url||null,author:a.display_name||a.username||'Calabar Member',author_id:p.author_id,is_verified:!!a.is_verified&&(!a.verified_until||new Date(a.verified_until).getTime()>Date.now()),avatar_url:a.avatar_url||null,category:p.category,created_at:p.created_at,like_count:(likes||[]).filter((x:any)=>x.post_id===p.id).length,liked_by_me:!!viewer&&(likes||[]).some((x:any)=>x.post_id===p.id&&x.user_id===viewer.id),share_count:(shares||[]).filter((x:any)=>x.post_id===p.id).length,shared_by_me:!!viewer&&(shares||[]).some((x:any)=>x.post_id===p.id&&x.user_id===viewer.id),comment_count:(comments||[]).filter((x:any)=>x.post_id===p.id).length}})}};
   }
   const user=await currentUser();
   if (path === '/api/messages') {
