@@ -21,6 +21,7 @@ import {
   ShieldCheck,
   ArrowUpRight,
   ShoppingCart,
+  Bookmark,
   UserRound,
   BadgeCheck,
 } from 'lucide-react';
@@ -397,6 +398,7 @@ export default function App() {
           ))}
           <button onClick={() => { setShowListingForm(true); setMenuOpen(false); }}>List a business or item <Plus size={16} /></button>
           <button onClick={async () => { if(!user){setShowAuth(true);return;} try {const r=await api.get('/api/profile');setProfile(r.data?.item||{username:user?.email?.split('@')[0]||'',display_name:user?.name||'',full_name:'',bio:'',avatar_url:''});}catch{} setShowProfile(true);setMenuOpen(false);}}>My profile <UserRound size={16}/></button>
+          <button onClick={() => { setActive("Marketplace"); setMenuOpen(false); setNotice(saved.length ? "Your saved items are marked with a heart in the marketplace." : "Tap the heart on any marketplace listing to save it."); }}>Saved items ({saved.length}) <Heart size={16}/></button>
           <button onClick={() => { setShowCart(true); setMenuOpen(false); }}>Shopping cart ({cart.length}) <ShoppingCart size={16}/></button>
           <button onClick={() => { setShowPeople(true); setMenuOpen(false); }}>Find people <UserRound size={16}/></button>
           <button onClick={() => { void openMemberPanel('messages'); setMenuOpen(false); }}>Messages <MessageCircle size={16}/></button>
@@ -857,7 +859,7 @@ export default function App() {
                         </small>
                         <p>{p.text}</p>
                         {p.image_url && <img className="post-photo" src={p.image_url} alt="Community post" />}
-                        <div className="post-actions"><button className="text-link" onClick={()=>void api.post('/api/posts/'+p.id+'/like',{}).then(()=>setNotice('Like updated.')).catch(()=>setNotice('Could not like post.'))}><Heart size={15}/> Like</button><button className="text-link" onClick={()=>openComments===p.id?setOpenComments(null):void loadComments(p.id)}><MessageCircle size={15}/> Reply</button><button className="text-link" onClick={()=>void api.post('/api/posts/'+p.id+'/share',{}).then(async()=>{const r=await api.get('/api/posts');setPosts(r.data?.items||[]);setNotice('Post reshared.');}).catch(()=>setNotice('Could not reshare post.'))}><ArrowUpRight size={15}/> Reshare</button></div>
+                        <div className="post-actions"><button className="text-link" onClick={()=>void api.post('/api/posts/'+p.id+'/like',{}).then(()=>setNotice('Like updated.')).catch(()=>setNotice('Could not like post.'))}><Heart size={15}/> Like</button><button className="text-link" onClick={()=>openComments===p.id?setOpenComments(null):void loadComments(p.id)}><MessageCircle size={15}/> Reply</button><button className="text-link" onClick={()=>setSaved(v=>v.includes("post:"+p.id)?v.filter(x=>x!=="post:"+p.id):[...v,"post:"+p.id])}><Bookmark size={15}/> Bookmark</button><button className="text-link" onClick={()=>void api.post('/api/posts/'+p.id+'/share',{}).then(async()=>{const r=await api.get('/api/posts');setPosts(r.data?.items||[]);setNotice('Post reshared.');}).catch(()=>setNotice('Could not reshare post.'))}><ArrowUpRight size={15}/> Reshare</button></div>
                         {openComments===p.id && <div className="comment-thread">{(comments[p.id]||[]).map((cm:any)=><p key={cm.id}><b>{cm.author_profile?.display_name||cm.author_profile?.username||'Member'}:</b> {cm.text}</p>)}<form onSubmit={e=>{e.preventDefault();void addComment(p.id);}}><input value={commentText[p.id]||''} onChange={e=>setCommentText(v=>({...v,[p.id]:e.target.value}))} placeholder="Write a reply..." required/><button type="submit" className="primary-btn">Reply</button></form></div>}
                       </div>
                     </article>
