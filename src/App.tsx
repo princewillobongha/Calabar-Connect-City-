@@ -227,20 +227,25 @@ export default function App() {
     [listings, category, query]
   );
   const signIn = async () => {
+    if (busy) return;
+    setBusy(true);
     try {
-      const result = await auth.signIn(authEmail, authPassword, authMode);
+      const result = await auth.signIn(authEmail.trim(), authPassword, authMode);
       if (!(result as any).confirmationRequired) setUser(result.user);
       setShowAuth(false);
       setAuthPassword('');
       setNotice((result as any).confirmationRequired ? 'Account created. Check your email to confirm, then sign in.' : 'You are signed in. Welcome to the community!');
     } catch (e: any) {
+      const message = typeof e?.message === 'string' ? e.message : '';
       setNotice(
-        e?.code === 'popup_blocked'
-          ? 'Allow pop-ups to finish signing in.'
-          : e?.code === 'popup_closed'
-            ? 'Sign-in was cancelled.'
-            : 'Could not sign in just now. Please try again.'
+        e?.code === 'invalid_credentials'
+          ? 'Email or password is incorrect. If you are new, choose Create an account first.'
+          : e?.code === 'email_not_confirmed'
+            ? 'Please confirm your email using the latest confirmation email before signing in.'
+            : message || 'Authentication failed. Please check your connection and try again.'
       );
+    } finally {
+      setBusy(false);
     }
   };
   const signOut = async () => {
@@ -1134,10 +1139,10 @@ export default function App() {
             <form className="auth-form" onSubmit={e => { e.preventDefault(); void signIn(); }}>
               <label>Email address<input type="email" autoComplete="email" required value={authEmail} onChange={e=>setAuthEmail(e.target.value)} placeholder="you@example.com" /></label>
               <label>Password<input type="password" autoComplete={authMode==='signup'?'new-password':'current-password'} minLength={6} required value={authPassword} onChange={e=>setAuthPassword(e.target.value)} placeholder="At least 6 characters" /></label>
-              <button className="primary-btn full-btn" type="submit"><LogIn size={17} /> {authMode==='signup'?'Create account':'Sign in securely'}</button>
+              <button className="primary-btn full-btn" type="submit" disabled={busy}><LogIn size={17} /> {busy ? 'Please wait…' : authMode==='signup'?'Create account':'Sign in securely'}</button>
             </form>
             <small className="fine-print">{authMode==='signup'?'Create your free Calabar Connect City account.':'Sign in to save favourites, publish listings and connect.'}</small>
-            <button className="text-link auth-switch" onClick={()=>setAuthMode(m=>m==='signin'?'signup':'signin')}>{authMode==='signup'?'Already have an account? Sign in':'New here? Create an account'}</button>
+            <button type="button" className="text-link auth-switch" onClick={()=>setAuthMode(m=>m==='signin'?'signup':'signin')}>{authMode==='signup'?'Already have an account? Sign in':'New here? Create an account'}</button>
           </div>
         </div>
       )}
