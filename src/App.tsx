@@ -362,6 +362,8 @@ export default function App() {
           >
             <MessageCircle size={19} />
           </button>
+          <button className="icon-btn" aria-label="Find people by username" onClick={()=>setShowPeople(true)}><UserRound size={19}/></button>
+          {(user?.email||'').toLowerCase()==='princewillobongha@gmail.com' && <button className="icon-btn" aria-label="Admin verification" onClick={()=>void openAdmin()}><ShieldCheck size={19}/></button>}
           {user ? (
             <button className="profile-pill" onClick={async () => { try { const r=await api.get("/api/profile"); setProfile(r.data?.item || {username:user?.email?.split("@")[0]||"",display_name:user?.name||"",full_name:"",bio:"",avatar_url:""}); } catch {} setShowProfile(true); }}>
               {user.avatar_url ? <img className="avatar profile-avatar-img" src={user.avatar_url} alt="Profile" /> : <span className="avatar">{(user.name || user.email || 'M').slice(0, 1).toUpperCase()}</span>}
