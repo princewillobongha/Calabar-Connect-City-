@@ -38,7 +38,7 @@ async function get(path: string) {
     const items=ensure(data,error).map((g:any)=>({id:g.id,name:g.name,category:g.name.toLowerCase().includes('food')?'Food':g.name.toLowerCase().includes('fashion')?'Fashion':g.name.toLowerCase().includes('job')?'Jobs':'Marketplace',description:g.description||'',members:g.group_members?.[0]?.count||0}));
     return {data:{items}};
   }
-  if (path === '/api/people') {
+  if (path.startsWith('/api/people')) {
     const q = new URLSearchParams(path.split('?')[1] || '').get('q') || '';
     const {data,error}=await supabase.from('profiles').select('id,username,display_name,avatar_url,bio,is_verified').ilike('username','%'+q.replace(/[%_]/g,'')+'%').limit(30);
     return {data:{items:ensure(data,error)}};
@@ -56,7 +56,7 @@ async function get(path: string) {
   }
   if (path === '/api/posts') {
     const {data,error}=await supabase.from('community_posts').select('*, author_profile:profiles!community_posts_author_id_fkey(display_name,username)').order('created_at',{ascending:false}).limit(80);
-    return {data:{items:ensure(data,error).map((p:any)=>({id:p.id,text:p.text,author:p.author_profile?.display_name||p.author_profile?.username||'Calabar Member',author_id:p.author_id,category:p.category,created_at:p.created_at}))}};
+    return {data:{items:ensure(data,error).map((p:any)=>({id:p.id,text:p.text,image_url:p.image_url||null,author:p.author_profile?.display_name||p.author_profile?.username||'Calabar Member',author_id:p.author_id,image_url:p.image_url||null,category:p.category,created_at:p.created_at}))}};
   }
   const user=await currentUser();
   if (path === '/api/messages') {
@@ -136,7 +136,7 @@ async function post(path: string, body: any) {
     if(error) fail(error.message);return {data:{ok:true}};
   }
   if(path==='/api/posts'){
-    const {data,error}=await supabase.from('community_posts').insert({author_id:user.id,text:body.text,category:body.category||'Community'}).select('*, author_profile:profiles!community_posts_author_id_fkey(display_name,username)').single();
+    const {data,error}=await supabase.from('community_posts').insert({author_id:user.id,text:body.text,image_url:body.image_url||null,category:body.category||'Community'}).select('*, author_profile:profiles!community_posts_author_id_fkey(display_name,username)').single();
     const p=ensure(data,error);return {data:{item:{id:p.id,text:p.text,author:p.author_profile?.display_name||profileName(user),author_id:p.author_id,category:p.category,created_at:p.created_at}}};
   }
   if(path.startsWith('/api/groups/')&&path.endsWith('/join')){
