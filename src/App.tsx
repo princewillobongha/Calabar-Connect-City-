@@ -37,6 +37,7 @@ type Listing = {
   images?: string[];
   vendor: string;
   kind: string;
+  vendor_owner_id?: string;
 };
 type Group = {
   id: string;
@@ -44,6 +45,8 @@ type Group = {
   category: string;
   description: string;
   members: number;
+  avatar_url?: string | null;
+  owner_id?: string;
 };
 type Post = {
   id: string;
@@ -55,6 +58,9 @@ type Post = {
   author_id?: string;
   is_verified?: boolean;
   avatar_url?: string | null;
+  like_count?: number;
+  liked_by_me?: boolean;
+  share_count?: number;
 };
 const categories = [
   { name: 'All', icon: ShoppingBag, color: 'sand' },
@@ -116,6 +122,13 @@ export default function App() {
   const [adminReports, setAdminReports] = useState<any[]>([]);
   const [groupName, setGroupName] = useState('');
   const [groupDescription, setGroupDescription] = useState('');
+  const [groupImage, setGroupImage] = useState<File|null>(null);
+  const [selectedGroup, setSelectedGroup] = useState<any>(null);
+  const [groupPostText, setGroupPostText] = useState('');
+  const [groupPostImage, setGroupPostImage] = useState<File|null>(null);
+  const [selectedPost, setSelectedPost] = useState<any>(null);
+  const [postSearchResults, setPostSearchResults] = useState<any[]>([]);
+  const [myGroupsOpen, setMyGroupsOpen] = useState(false);
   const [openComments, setOpenComments] = useState<string|null>(null);
   const [comments, setComments] = useState<Record<string,any[]>>({});
   const [commentText, setCommentText] = useState<Record<string,string>>({});
@@ -201,13 +214,22 @@ export default function App() {
   useEffect(() => { localStorage.setItem('ccc-cart', JSON.stringify(cart)); }, [cart]);
   const searchPeople = async () => { try { const r=await api.get('/api/people?q='+encodeURIComponent(peopleQuery)); setPeople(r.data?.items||[]); } catch { setNotice('Could not search members.'); } };
   const openAdmin = async () => { if((user?.email||'').toLowerCase()!=='princewillobongha@gmail.com'){setNotice('Admin access required.');return;} try {const [profilesResult,reportsResult]=await Promise.all([api.get('/api/admin/profiles'),api.get('/api/admin/reports')]);setAdminProfiles(profilesResult.data?.items||[]);setAdminReports(reportsResult.data?.items||[]);setShowAdmin(true);} catch(e:any){setNotice(e?.message||'Could not load admin tools.');} };
-  const saveProfile = async () => { try { const r=await api.post('/api/profile',profile); setProfile(r.data.item); setUser((u:any)=>({...u,name:r.data.item.display_name,username:r.data.item.username,avatar_url:r.data.item.avatar_url})); setShowProfile(false); setNotice('Profile saved.'); } catch(e:any) { setNotice(e?.message||'Could not save profile.'); } };
+  const saveProfile = async () => { try { const r=await api.post('/api/profile',profile); setProfile(r.data.item); setUser((u:any)=>({...u,name:r.data.item.display_name,username:r.data.item.username,avatar_url:r.data.item.avatar_url,city:r.data.item.city})); setShowProfile(false); setNotice('Profile saved.'); } catch(e:any) { setNotice(e?.message||'Could not save profile.'); } };
   const openPublicProfile = async (id:string) => { try { const r=await api.get('/api/profile/'+id); setPublicProfile(r.data?.item||null); setIsFollowingProfile(!!r.data?.is_following); } catch(e:any) { setNotice(e?.message||'Could not load this profile.'); } };
+  const openGroup = async (group:any) => { setActive('Groups');setSelectedGroup({...group,loading:true});try{const r=await api.get('/api/groups/'+group.id);setSelectedGroup(r.data?.item||group);}catch(e:any){setSelectedGroup({...group,loading:false});setNotice(e?.message||'Could not open this group.');} };
+  const joinGroup = async (group:any) => {if(!requireMember('Sign in to join a group.'))return;try{await api.post('/api/groups/'+group.id+'/join',{});await openGroup(group);setNotice('You joined '+group.name+'.');}catch(e:any){setNotice(e?.message||'Could not join this group.');}};
+  const createGroupPost = async () => {if(!selectedGroup||!requireMember('Sign in to post in this group.'))return;if(!groupPostText.trim()){setNotice('Write something before posting.');return;}setBusy(true);try{const image_url=groupPostImage?await uploadImage(groupPostImage):null;await api.post('/api/groups/'+selectedGroup.id+'/posts',{text:groupPostText.trim(),image_url});setGroupPostText('');setGroupPostImage(null);await openGroup(selectedGroup);setNotice('Your group post is published.');}catch(e:any){setNotice(e?.message||'Could not publish in this group.');}finally{setBusy(false);}};
+  const deleteGroupPost = async (post:any) => {if(!selectedGroup||!window.confirm('Delete this post from the group?'))return;try{await api.delete('/api/groups/'+selectedGroup.id+'/posts/'+post.id);await openGroup(selectedGroup);setNotice('Group post deleted.');}catch(e:any){setNotice(e?.message||'Could not delete this group post.');}};
+  const removeGroupMember = async (member:any) => {if(!selectedGroup||!window.confirm('Remove this member from the group?'))return;try{await api.delete('/api/groups/'+selectedGroup.id+'/members/'+member.user_id);await openGroup(selectedGroup);setNotice('Member removed from the group.');}catch(e:any){setNotice(e?.message||'Could not remove this member.');}};
+  const openPost = async (post:any) => {setSelectedPost(post);await loadComments(post.id);};
+  const deletePost = async (post:any) => {if(!window.confirm('Delete your post? This cannot be undone.'))return;try{await api.delete('/api/posts/'+post.id);setPosts(v=>v.filter(p=>p.id!==post.id));if(selectedPost?.id===post.id)setSelectedPost(null);setNotice('Post deleted.');}catch(e:any){setNotice(e?.message||'Could not delete this post.');}};
+  const toggleReshare = async (post:any) => {if(!requireMember('Sign in to reshare posts.'))return;try{if(post.shared_by_me)await api.delete('/api/posts/'+post.id+'/share');else await api.post('/api/posts/'+post.id+'/share',{});const r=await api.get('/api/posts');setPosts(r.data?.items||[]);setNotice(post.shared_by_me?'Reshare removed.':'Post reshared.');}catch(e:any){setNotice(e?.message||'Could not update reshare.');}};
+  const toggleLike = async (post:any) => {if(!requireMember('Sign in to like posts.'))return;try{const r=await api.post('/api/posts/'+post.id+'/like',{});setPosts(v=>v.map(p=>p.id===post.id?{...p,liked_by_me:!!r.data?.liked,like_count:Math.max(0,(p.like_count||0)+(r.data?.liked?1:-1))}:p));if(selectedPost?.id===post.id)setSelectedPost((p:any)=>({...p,liked_by_me:!!r.data?.liked,like_count:Math.max(0,(p.like_count||0)+(r.data?.liked?1:-1))}));}catch(e:any){setNotice(e?.message||'Could not update like.');}};
   const toggleFollow = async (id:string) => { if(!requireMember('follow members'))return; try { const r=await api.post('/api/follows/toggle',{followed_id:id}); setIsFollowingProfile(!!r.data?.following); setNotice(r.data?.following?'You are now following this member.':'You unfollowed this member.'); } catch(e:any) { setNotice(e?.message||'Could not update follow status.'); } };
   const contactSeller = async (listing:Listing) => { const popup=window.open('about:blank','_blank'); try { const r=await api.get('/api/listings/'+listing.id+'/contact'); const url=String(r.data?.url||''); if(!url) { popup?.close(); setNotice('This seller has not added a WhatsApp contact yet.'); return; } if(popup) popup.location.href=url; else window.location.href=url; } catch(e:any) { popup?.close(); setNotice(e?.message||'Could not open seller contact.'); } };
   const loadComments = async (id:string) => { setOpenComments(id); try { const r=await api.get('/api/comments/'+id); setComments(p=>({...p,[id]:r.data?.items||[]})); } catch { setNotice('Could not load replies.'); } };
   const addComment = async (id:string) => { if(!requireMember('Sign in to reply.'))return; const text=(commentText[id]||'').trim(); if(!text)return; try { await api.post('/api/comments/'+id,{text}); setCommentText(p=>({...p,[id]:''})); await loadComments(id); } catch(e:any) { setNotice(e?.message||'Could not post reply.'); } };
-  const createGroup = async () => { if(!requireMember('Sign in to create a group.'))return; if(groupName.trim().length<3){setNotice('Group name must be at least 3 characters.');return;} setBusy(true); try { const r=await api.post('/api/groups',{name:groupName,description:groupDescription}); setGroups(p=>[r.data.item,...p]); setShowGroupForm(false); setGroupName(''); setGroupDescription(''); setNotice('Group created successfully.'); } catch(e:any) { setNotice(e?.message||'Could not create group.'); } finally {setBusy(false);} };
+  const createGroup = async () => { if(!requireMember('Sign in to create a group.'))return; if(groupName.trim().length<3){setNotice('Group name must be at least 3 characters.');return;} setBusy(true); try { const avatar_url=groupImage?await uploadImage(groupImage):null; const r=await api.post('/api/groups',{name:groupName,description:groupDescription,avatar_url}); setGroups(p=>[r.data.item,...p]); setShowGroupForm(false); setGroupName(''); setGroupDescription(''); setGroupImage(null); setNotice('Group created successfully.'); await openGroup(r.data.item); } catch(e:any) { setNotice(e?.message||'Could not create group.'); } finally {setBusy(false);} };
   const saveListing = async () => {
     if (!requireMember('Sign in to publish a listing.')) return;
     if (!form.title.trim() || !form.description.trim()) {
@@ -341,19 +363,7 @@ export default function App() {
             <small>YOUR CITY, CONNECTED</small>
           </span>
         </a>
-        <div className="top-search">
-          <Search size={18} />
-          <input
-            aria-label="Search Calabar"
-            placeholder="Find vendors, food, services, jobs..."
-            value={query}
-            onChange={e => {
-              setQuery(e.target.value);
-              setActive('Marketplace');
-            }}
-          />
-          <kbd>⌕</kbd>
-        </div>
+  
         <div className="top-actions">
           <button
             className="icon-btn notification"
@@ -369,7 +379,6 @@ export default function App() {
           >
             <MessageCircle size={19} />
           </button>
-          <button className="icon-btn" aria-label="Find people by username" onClick={()=>setShowPeople(true)}><UserRound size={19}/></button>
           {(user?.email||'').toLowerCase()==='princewillobongha@gmail.com' && <button className="icon-btn" aria-label="Admin verification" onClick={()=>void openAdmin()}><ShieldCheck size={19}/></button>}
           {user ? (
             <button className="profile-pill" onClick={async () => { try { const r=await api.get("/api/profile"); setProfile(r.data?.item || {username:user?.email?.split("@")[0]||"",display_name:user?.name||"",full_name:"",bio:"",avatar_url:""}); } catch {} setShowProfile(true); }}>
@@ -442,6 +451,7 @@ export default function App() {
             );
           })}
           <div className="side-divider" />
+          <button className={'nav-item '+(active==='Search'?'active':'')} onClick={()=>{setActive('Search');setPeopleQuery('');setPeople([]);}}><Search size={18}/><span>Search people</span></button>
           <div className="side-label">COMMUNITY GROUPS</div>
           {groups.slice(0, 4).map(group => (
             <button
@@ -603,13 +613,8 @@ export default function App() {
                     <span className="float-icon">
                       <Store size={18} />
                     </span>
-                    <span>
-                      <b>Shop local</b>
-                      <small>Meet the makers</small>
-                    </span>
-                    <span className="float-arrow">
-                      <ArrowUpRight size={15} />
-                    </span>
+                    <button className="shop-local-link" onClick={()=>{if(!requireMember('Sign in to view your groups.'))return;void api.get('/api/groups/mine').then(r=>{const mine=r.data?.items||[];if(!mine.length){setNotice('You have not joined any groups yet. Open Groups to discover and join one.');setActive('Groups');return;}setMemberItems(mine);setMemberPanel(null);setShowPeople(false);setActive('Groups');setMyGroupsOpen(true);}).catch((e:any)=>setNotice(e?.message||'Could not load your groups.'));}}><b>Shop local</b><small>Choose one of your groups</small></button>
+                    <span className="float-arrow"><ArrowUpRight size={15} /></span>
                   </div>
                   <div className="hero-sparkle">✳</div>
                 </div>
@@ -772,7 +777,7 @@ export default function App() {
           )}
           {!memberPanel && active === 'Groups' && (
             <>
-              <div className="page-title">
+              {!selectedGroup && <div className="page-title">
                 <div>
                   <div className="eyebrow muted">FIND YOUR PEOPLE</div>
                   <h1>Community groups</h1>
@@ -786,8 +791,8 @@ export default function App() {
                 >
                   <Plus size={17} /> Create a group
                 </button>
-              </div>
-              {groups.length===0 ? <div className="empty-state"><Users size={28}/><h3>No groups yet</h3><p>Create the first community group.</p><button className="primary-btn" onClick={()=>{if(requireMember('Sign in to create a group.'))setShowGroupForm(true);}}>Create a group</button></div> : <div className="group-grid">
+              </div>}
+              {!selectedGroup && (groups.length===0 ? <div className="empty-state"><Users size={28}/><h3>No groups yet</h3><p>Create the first community group.</p><button className="primary-btn" onClick={()=>{if(requireMember('Sign in to create a group.'))setShowGroupForm(true);}}>Create a group</button></div> : <div className="group-grid">
                 {groups.map((g, i) => (
                   <article className="group-card" key={g.id}>
                     <div className={'group-art art-' + i}>
@@ -809,7 +814,15 @@ export default function App() {
                     </div>
                   </article>
                 ))}
-              </div>}
+              </div>)}
+              {selectedGroup && <section className="group-detail-page">
+                <button className="ghost-btn" onClick={()=>setSelectedGroup(null)}>← All groups</button>
+                <div className="group-profile-hero">{selectedGroup.avatar_url?<img src={selectedGroup.avatar_url} alt="Group"/>:<div className="group-avatar-fallback"><Users size={34}/></div>}<div><h1>{selectedGroup.name}</h1><p>{selectedGroup.description||'A community space for local members.'}</p><small>{selectedGroup.members||0} members</small></div>{selectedGroup.is_owner&&<label className="group-avatar-change">Change group photo<input type="file" accept="image/*" onChange={async e=>{const f=e.target.files?.[0];if(f)try{const avatar_url=await uploadImage(f);await api.post('/api/groups/'+selectedGroup.id+'/update',{avatar_url,description:selectedGroup.description});await openGroup(selectedGroup);setNotice('Group photo updated.');}catch(err:any){setNotice(err?.message||'Could not update group photo.');}}}/></label>}</div>
+                {!selectedGroup.is_member&&!selectedGroup.is_owner&&<button className="primary-btn" onClick={()=>void joinGroup(selectedGroup)}>Join group</button>}
+                {selectedGroup.is_member||selectedGroup.is_owner ? <div className="group-composer"><h3>Write a post</h3><textarea value={groupPostText} onChange={e=>setGroupPostText(e.target.value)} placeholder={'Share something with '+selectedGroup.name+'…'}/><div className="composer-actions"><label className="ghost-btn">Add photo<input type="file" accept="image/*" onChange={e=>setGroupPostImage(e.target.files?.[0]||null)}/></label>{groupPostImage&&<small>{groupPostImage.name}</small>}<button className="primary-btn" disabled={busy} onClick={()=>void createGroupPost()}>{busy?'Posting…':'Post to group'}</button></div></div>:<p className="muted">Join this group to read and publish group posts.</p>}
+                <div className="group-post-list">{(selectedGroup.posts||[]).map((gp:any)=><article className="feed-card group-post-card" key={gp.id}><button className="feed-avatar feed-avatar-button" onClick={()=>void openPublicProfile(gp.author_id)}>{gp.avatar_url?<img src={gp.avatar_url} alt=""/>:(gp.author||'M').slice(0,1)}</button><div><button className="post-author-link" onClick={()=>void openPublicProfile(gp.author_id)}>{gp.author} {gp.is_verified&&<BadgeCheck size={15} className="verified-badge"/>}</button><small>{new Date(gp.created_at).toLocaleString()}</small><p>{gp.text}</p>{gp.image_url&&<img className="post-photo" src={gp.image_url} alt="Group post"/>}{(selectedGroup.is_owner||gp.author_id===user?.userId||gp.author_id===user?.id)&&<button className="text-link danger-link" onClick={()=>void deleteGroupPost(gp)}>Delete post</button>}</div></article>)}{!(selectedGroup.posts||[]).length&&<div className="empty-state"><Users size={25}/><h3>No posts yet</h3><p>Be the first to post in this group.</p></div>}</div>
+                {selectedGroup.is_owner&&<div className="group-members-panel"><h3>Manage members</h3>{(selectedGroup.member_list||[]).map((m:any)=><div className="group-member-row" key={m.user_id}><button className="post-author-link" onClick={()=>void openPublicProfile(m.user_id)}>{m.profile?.display_name||m.profile?.username||'Member'} {m.role==='owner'?'· Admin':''}</button>{m.user_id!==user?.userId&&m.user_id!==user?.id&&<button className="text-link danger-link" onClick={()=>void removeGroupMember(m)}>Remove</button>}</div>)}</div>}
+              </section>}
             </>
           )}
           {!memberPanel && active === 'Community' && (
@@ -979,7 +992,7 @@ export default function App() {
               <button
                 className="popular-group"
                 key={g.id}
-                onClick={() => setActive('Groups')}
+                onClick={() => void openGroup(g)}
               >
                 <span className={'popular-symbol ps-' + i}>
                   {g.name.slice(0, 1)}
