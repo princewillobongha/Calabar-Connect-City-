@@ -203,7 +203,8 @@ export const auth = {
   async getUser(){
     const {data}=await supabase.auth.getUser();
     if(!data.user)return null;
-    return {userId:data.user.id,email:data.user.email,name:profileName(data.user),...data.user};
+    const {data:profile}=await supabase.from('profiles').select('username,display_name,full_name,avatar_url,bio,is_verified').eq('id',data.user.id).maybeSingle();
+    return {userId:data.user.id,email:data.user.email,name:profile?.display_name||profileName(data.user),username:profile?.username||'',avatar_url:profile?.avatar_url||'',bio:profile?.bio||'',is_verified:!!profile?.is_verified,...data.user};
   },
   async signIn(email?:string,password?:string,mode:'signin'|'signup'='signin'){
     if(!email||!password) throw new Error('Enter your email and password.');
