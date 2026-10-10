@@ -34,8 +34,8 @@ async function get(path: string) {
     return {data:{items:ensure(data,error).map(asItem)}};
   }
   if (path === '/api/groups') {
-    const {data,error}=await supabase.from('community_groups').select('*, group_members(count)').order('created_at',{ascending:true});
-    const items=ensure(data,error).map((g:any)=>({id:g.id,name:g.name,category:g.name.toLowerCase().includes('food')?'Food':g.name.toLowerCase().includes('fashion')?'Fashion':g.name.toLowerCase().includes('job')?'Jobs':'Marketplace',description:g.description||'',members:g.group_members?.[0]?.count||0}));
+    const {data,error}=await supabase.from('community_groups').select('*').eq('visibility','public').order('created_at',{ascending:true});
+    const items=ensure(data,error).map((g:any)=>({id:g.id,name:g.name,category:g.name.toLowerCase().includes('food')?'Food':g.name.toLowerCase().includes('fashion')?'Fashion':g.name.toLowerCase().includes('job')?'Jobs':'Community',description:g.description||'',members:0}));
     return {data:{items}};
   }
   if (path.startsWith('/api/people')) {
