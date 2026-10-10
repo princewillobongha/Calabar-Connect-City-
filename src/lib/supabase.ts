@@ -55,8 +55,8 @@ async function get(path: string) {
     return {data:{items:ensure(data,error)}};
   }
   if (path === '/api/posts') {
-    const {data,error}=await supabase.from('community_posts').select('*, author_profile:profiles!community_posts_author_id_fkey(display_name,username)').order('created_at',{ascending:false}).limit(80);
-    return {data:{items:ensure(data,error).map((p:any)=>({id:p.id,text:p.text,image_url:p.image_url||null,author:p.author_profile?.display_name||p.author_profile?.username||'Calabar Member',author_id:p.author_id,image_url:p.image_url||null,category:p.category,created_at:p.created_at}))}};
+    const {data,error}=await supabase.from('community_posts').select('*, author_profile:profiles!community_posts_author_id_fkey(display_name,username,is_verified,avatar_url)').order('created_at',{ascending:false}).limit(80);
+    return {data:{items:ensure(data,error).map((p:any)=>({id:p.id,text:p.text,image_url:p.image_url||null,author:p.author_profile?.display_name||p.author_profile?.username||'Calabar Member',author_id:p.author_id,is_verified:!!p.author_profile?.is_verified,avatar_url:p.author_profile?.avatar_url||null,category:p.category,created_at:p.created_at}))}};
   }
   const user=await currentUser();
   if (path === '/api/messages') {
@@ -72,6 +72,11 @@ async function get(path: string) {
   if (path === '/api/notifications') {
     const {data,error}=await supabase.from('notifications').select('*').eq('user_id',user.id).order('created_at',{ascending:false}).limit(100);
     return {data:{items:ensure(data,error).map((n:any)=>({...n,read:!!n.read_at}))}};
+  }
+  if (path === '/api/admin/profiles') {
+    if ((user.email||'').toLowerCase() !== 'princewillobongha@gmail.com') fail('Admin access required.');
+    const {data,error}=await supabase.from('profiles').select('id,username,display_name,avatar_url,is_verified').order('created_at',{ascending:false}).limit(200);
+    return {data:{items:ensure(data,error)}};
   }
   if (path === '/api/admin/reports') {
     const {data,error}=await supabase.from('moderation_reports').select('*').order('created_at',{ascending:false}).limit(300);
@@ -100,6 +105,11 @@ async function post(path: string, body: any) {
     const numeric=Number(String(body.price||'').replace(/[^0-9.]/g,''))||0;
     const {data,error}=await supabase.from('listings').insert({vendor_id:vendor.id,title:body.title,description:body.description,price_ngn:numeric,image_urls:body.image?[body.image]:[],category:body.category||'Product'}).select('*, vendor:vendors(*)').single();
     return {data:{item:asItem(ensure(data,error))}};
+  }
+  if(path==='/api/admin/verify'){
+    if ((user.email||'').toLowerCase() !== 'princewillobongha@gmail.com') fail('Admin access required.');
+    const {data,error}=await supabase.from('profiles').update({is_verified:!!body.verified,updated_at:new Date().toISOString()}).eq('id',body.user_id).select('id,is_verified').single();
+    return {data:{item:ensure(data,error)}};
   }
   if(path==='/api/profile'){
     const username=String(body.username||'').trim().toLowerCase().replace(/^@/,'');
