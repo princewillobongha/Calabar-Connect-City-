@@ -790,7 +790,7 @@ export default function App() {
                 {groups.map((g, i) => (
                   <article className="group-card" key={g.id}>
                     <div className={'group-art art-' + i}>
-                      <Users size={28} />
+                      {g.avatar_url ? <img className="group-card-avatar" src={g.avatar_url} alt={g.name}/> : <Users size={28}/>}
                       <span>{g.category}</span>
                     </div>
                     <div className="group-card-body">
