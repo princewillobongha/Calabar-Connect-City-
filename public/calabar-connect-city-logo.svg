@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 170" role="img" aria-label="Calabar Connect City logo">
+  <defs>
+    <mask id="remove-dark-background" maskUnits="userSpaceOnUse" x="0" y="0" width="256" height="256" mask-type="luminance">
+      <image href="/calabar-connect-city-logo.jpg" x="0" y="0" width="256" height="256" preserveAspectRatio="none" style="filter:brightness(2.2)"/>
+    </mask>
+  </defs>
+  <image href="/calabar-connect-city-logo.jpg" x="0" y="0" width="256" height="256" preserveAspectRatio="none" mask="url(#remove-dark-background)"/>
+</svg>
