@@ -142,8 +142,13 @@ async function post(path: string, body: any) {
   }
   if(path.startsWith('/api/posts/')&&path.endsWith('/share')){
     const postId=path.split('/')[3];
-    const {error}=await supabase.from('community_post_shares').upsert({post_id:postId,user_id:user.id},{onConflict:'post_id,user_id'});
-    if(error) fail(error.message);return {data:{ok:true}};
+    const {data:original,error:oe}=await supabase.from('community_posts').select('text,image_url,category').eq('id',postId).single();
+    if(oe) fail(oe.message);
+    const {data:share,error}=await supabase.from('community_post_shares').upsert({post_id:postId,user_id:user.id},{onConflict:'post_id,user_id'}).select('*').single();
+    if(error) fail(error.message);
+    const {data:repost,error:re}=await supabase.from('community_posts').insert({author_id:user.id,text:original.text,image_url:original.image_url,category:'Repost'}).select('id').single();
+    if(re) fail(re.message);
+    return {data:{ok:true,item:{id:repost.id,original_post_id:postId}}};
   }
   if(path==='/api/posts'){
     const {data,error}=await supabase.from('community_posts').insert({author_id:user.id,text:body.text,image_url:body.image_url||null,category:body.category||'Community'}).select('*, author_profile:profiles!community_posts_author_id_fkey(display_name,username)').single();
