@@ -431,6 +431,9 @@ export default function App() {
               </button>
             );
           })}
+          <button className={`nav-item ${active === 'Search' ? 'active' : ''}`} onClick={() => { setActive('Search'); setPeopleQuery(''); void api.get('/api/people').then(r=>setPeople(r.data?.items||[])).catch(()=>setNotice('Could not load members. Please try again.')); }}>
+            <Search size={18}/><span>Search people</span>
+          </button>
           <div className="side-divider" />
           <div className="side-label">COMMUNITY GROUPS</div>
           {groups.slice(0, 4).map(group => (
