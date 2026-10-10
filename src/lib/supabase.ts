@@ -17,11 +17,10 @@ const currentUser = async () => {
 };
 const profileName = (u: any) => u?.user_metadata?.display_name || u?.user_metadata?.full_name || u?.email?.split('@')[0] || 'Calabar Member';
 const slugify = (s: string) => s.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'local-business';
-const asItem = (x: any) => ({...x, id:x.id, title:x.title, category:x.category, price: x.price_ngn ? '₦'+Number(x.price_ngn).toLocaleString('en-NG') : 'Ask for price', location:x.vendor?.address || x.vendor?.area || 'Calabar, Cross River', description:x.description || '', image:x.image_urls?.[0] || x.vendor?.cover_image_url || '', vendor:x.vendor?.business_name || 'Calabar vendor', kind:x.category || 'Product'});
+const asItem = (x: any) => ({...x, id:x.id, title:x.title, category:x.category, price: x.price_ngn ? '₦'+Number(x.price_ngn).toLocaleString('en-NG') : 'Ask for price', location:x.vendor?.address || x.vendor?.area || 'Calabar, Cross River', description:x.description || '', images:Array.isArray(x.image_urls)?x.image_urls:[], image:x.image_urls?.[0] || x.vendor?.cover_image_url || '', vendor:x.vendor?.business_name || 'Calabar vendor', kind:x.category || 'Product'});
 export async function uploadImage(file: File) {
   const user = await currentUser();
   if (!file.type.startsWith('image/')) fail('Choose an image file.');
-  if (file.size > 10 * 1024 * 1024) fail('Images must be 10 MB or smaller.');
   const ext = (file.name.split('.').pop() || 'jpg').replace(/[^a-z0-9]/gi,'').toLowerCase();
   const key = user.id + '/' + crypto.randomUUID() + '.' + ext;
   const { error } = await supabase.storage.from('community-media').upload(key, file, { upsert: false, contentType: file.type });
@@ -30,8 +29,19 @@ export async function uploadImage(file: File) {
 }
 async function get(path: string) {
   if (path === '/api/listings') {
-    const {data,error}=await supabase.from('listings').select('*, vendor:vendors(*)').eq('is_available',true).order('created_at',{ascending:false}).limit(100);
+    const {data,error}=await supabase.from('listings').select('*, vendor:vendors(id,business_name,address,area,cover_image_url)').eq('is_available',true).order('created_at',{ascending:false}).limit(100);
     return {data:{items:ensure(data,error).map(asItem)}};
+  }
+  const contactMatch = path.match(/^\/api\/listings\/([^/]+)\/contact$/);
+  if (contactMatch) {
+    const {data:listing,error:listingError}=await supabase.from('listings').select('vendor_id').eq('id',contactMatch[1]).single();
+    if(listingError) fail(listingError.message);
+    const {data:vendor,error}=await supabase.from('vendors').select('whatsapp_url').eq('id',listing.vendor_id).maybeSingle();
+    if(error) fail(error.message);
+    let url=String(vendor?.whatsapp_url||'').trim();
+    if(url && /^\+?[0-9\s()-]+$/.test(url)) url='https://wa.me/'+url.replace(/\D/g,'');
+    if(url && !/^https:\/\/(wa\.me\/|api\.whatsapp\.com\/)/i.test(url)) fail('Seller WhatsApp contact is not a valid WhatsApp link.');
+    return {data:{url}};
   }
   if (path === '/api/groups') {
     const {data,error}=await supabase.from('community_groups').select('*').eq('visibility','public').order('created_at',{ascending:true});
@@ -43,7 +53,19 @@ async function get(path: string) {
     const {data,error}=await supabase.from('profiles').select('id,username,display_name,avatar_url,bio,is_verified').ilike('username','%'+q.replace(/[%_]/g,'')+'%').limit(30);
     return {data:{items:ensure(data,error)}};
   }
-  if (path.startsWith('/api/profile')) {
+  const publicProfileMatch = path.match(/^\/api\/profile\/([^/]+)$/);
+  if (publicProfileMatch) {
+    const user=await currentUser();
+    const targetId=publicProfileMatch[1];
+    const {data,error}=await supabase.from('profiles').select('id,username,display_name,full_name,avatar_url,bio,is_verified,created_at').eq('id',targetId).single();
+    if(error) fail(error.message);
+    const {data:posts,error:postError}=await supabase.from('community_posts').select('id,text,image_url,created_at').eq('author_id',targetId).order('created_at',{ascending:false}).limit(30);
+    if(postError) fail(postError.message);
+    const {data:follow,error:followError}=await supabase.from('community_follows').select('follower_id').eq('follower_id',user.id).eq('followed_id',targetId).maybeSingle();
+    if(followError) fail(followError.message);
+    return {data:{item:{...data,posts:posts||[]},is_following:!!follow}};
+  }
+  if (path === '/api/profile') {
     const user=await currentUser();
     const {data,error}=await supabase.from('profiles').select('*').eq('id',user.id).maybeSingle();
     if(error) fail(error.message);
@@ -99,8 +121,11 @@ async function post(path: string, body: any) {
     if(ve) fail(ve.message);
     if(!vendor){
       const name=profileName(user);
-      const {data,error}=await supabase.from('vendors').insert({owner_id:user.id,business_name:name,slug:slugify(name)+'-'+user.id.slice(0,8),category:body.category||'General',description:body.description||'',address:body.location||'Calabar, Cross River',area:body.location||'Calabar'}).select('*').single();
+      const {data,error}=await supabase.from('vendors').insert({owner_id:user.id,business_name:name,slug:slugify(name)+'-'+user.id.slice(0,8),category:body.category||'General',description:body.description||'',address:body.location||'Calabar, Cross River',area:body.location||'Calabar',whatsapp_url:body.whatsapp_url||null}).select('*').single();
       vendor=ensure(data,error);
+    } else if(body.whatsapp_url) {
+      const {error}=await supabase.from('vendors').update({whatsapp_url:body.whatsapp_url,updated_at:new Date().toISOString()}).eq('id',vendor.id).eq('owner_id',user.id);
+      if(error) fail(error.message);
     }
     const numeric=Number(String(body.price||'').replace(/[^0-9.]/g,''))||0;
     const {data,error}=await supabase.from('listings').insert({vendor_id:vendor.id,title:body.title,description:body.description,price_ngn:numeric,image_urls:Array.isArray(body.image_urls)?body.image_urls:(body.image?[body.image]:[]),category:body.category||'Product'}).select('*, vendor:vendors(*)').single();
@@ -117,14 +142,22 @@ async function post(path: string, body: any) {
     const {data,error}=await supabase.from('profiles').upsert({id:user.id,username,display_name:String(body.display_name||'').trim()||username,full_name:String(body.full_name||'').trim()||null,bio:String(body.bio||'').trim(),avatar_url:body.avatar_url||null,updated_at:new Date().toISOString()},{onConflict:'id'}).select('*').single();
     return {data:{item:ensure(data,error)}};
   }
+  if(path==='/api/follows/toggle'){
+    const followedId=String(body.followed_id||'').trim();
+    if(!followedId||followedId===user.id) fail('Choose another member to follow.');
+    const {data:existing,error:lookupError}=await supabase.from('community_follows').select('follower_id').eq('follower_id',user.id).eq('followed_id',followedId).maybeSingle();
+    if(lookupError) fail(lookupError.message);
+    if(existing){const {error}=await supabase.from('community_follows').delete().eq('follower_id',user.id).eq('followed_id',followedId);if(error)fail(error.message);return {data:{following:false}};}
+    const {error}=await supabase.from('community_follows').insert({follower_id:user.id,followed_id:followedId});if(error)fail(error.message);return {data:{following:true}};
+  }
   if(path==='/api/groups'){
     const name=String(body.name||'').trim();
     if(name.length<3) fail('Group name must be at least 3 characters.');
     const slug=slugify(name)+'-'+user.id.slice(0,6);
     const {data,error}=await supabase.from('community_groups').insert({owner_id:user.id,name,slug,description:String(body.description||'').trim(),visibility:body.visibility==='private'?'private':'public'}).select('*').single();
     const group=ensure(data,error);
-    const {error:memberError}=await supabase.from('group_members').upsert({group_id:group.id,user_id:user.id,role:'owner',status:'active'},{onConflict:'group_id,user_id'});
-    if(memberError) fail(memberError.message);
+    const {error:memberError}=await supabase.from('group_members').insert({group_id:group.id,user_id:user.id,role:'owner',status:'active'});
+    if(memberError) fail('Group was created but membership could not be added: '+memberError.message);
     return {data:{item:{id:group.id,name:group.name,description:group.description||'',members:1,category:'Community'}}};
   }
   if(path.startsWith('/api/comments/')){
@@ -159,7 +192,10 @@ async function post(path: string, body: any) {
   }
   if(path.startsWith('/api/groups/')&&path.endsWith('/join')){
     const id=path.split('/')[3];
-    const {error}=await supabase.from('group_members').upsert({group_id:id,user_id:user.id,role:'member',status:'active'},{onConflict:'group_id,user_id'});
+    const {data:existing,error:lookupError}=await supabase.from('group_members').select('group_id').eq('group_id',id).eq('user_id',user.id).maybeSingle();
+    if(lookupError) fail(lookupError.message);
+    if(existing) return {data:{ok:true,alreadyJoined:true}};
+    const {error}=await supabase.from('group_members').insert({group_id:id,user_id:user.id,role:'member',status:'active'});
     if(error) fail(error.message);return {data:{ok:true}};
   }
   if(path==='/api/messages'){
