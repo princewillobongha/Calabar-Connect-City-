@@ -1919,3 +1919,12 @@ select:focus-visible {
   .modal { width:100%; max-height:calc(100dvh - 24px); }
   .profile-rating { gap:5px; }
 }
+
+
+.notification-unread { border-left:3px solid #16794b; background:rgba(22,121,75,.06); cursor:pointer; }
+.subscription-plans { display:grid; gap:12px; margin-top:18px; }
+.subscription-plan { display:flex; flex-direction:column; gap:7px; text-align:left; border:1px solid rgba(22,121,75,.25); border-radius:14px; padding:16px; background:#fff; color:#173b28; cursor:pointer; }
+.subscription-plan:hover,.subscription-plan:focus-visible { border-color:#16794b; box-shadow:0 6px 20px rgba(22,121,75,.12); }
+.subscription-plan b { font-size:15px; }
+.subscription-plan strong { font-size:24px; }
+.subscription-plan span { color:#16794b; font-size:12px; font-weight:700; }
