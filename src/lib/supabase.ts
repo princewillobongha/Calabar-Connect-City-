@@ -101,6 +101,7 @@ async function get(path: string) {
     return {data:{items:ensure(data,error)}};
   }
   if (path === '/api/admin/reports') {
+    if ((user.email||'').toLowerCase() !== 'princewillobongha@gmail.com') fail('Admin access required.');
     const {data,error}=await supabase.from('moderation_reports').select('*').order('created_at',{ascending:false}).limit(300);
     return {data:{items:ensure(data,error)}};
   }
