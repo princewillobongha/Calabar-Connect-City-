@@ -527,7 +527,7 @@ export default function App() {
               )}
               <div className="member-list">
                 {memberItems.length ? memberItems.map((item, i) => (
-                  <article className="member-item" key={item.id || i}>
+                  <article className={'member-item '+(memberPanel==='notifications'&&!item.read?'notification-unread':'')} key={item.id || i} onClick={()=>{if(memberPanel==='notifications'&&!item.read&&item.id){void api.post('/api/notifications/'+item.id+'/read',{}).then(()=>{setMemberItems(items=>items.map((n:any)=>n.id===item.id?{...n,read:true}:n));setUnreadNotifications(v=>Math.max(0,v-1));}).catch(()=>{});}}}>
                     <b>{item.title || item.from_name || item.sender_name || item.kind || 'Community update'}</b>
                     <p>{item.body || item.text || (item.status ? 'Status: ' + item.status : '')}</p>
                     <small>{item.created_at ? new Date(item.created_at).toLocaleString() : ''}{item.sender_id ? ' · Member ID: ' + (item.sender_id === user?.userId ? item.recipient_id : item.sender_id) : ''}</small>
@@ -537,7 +537,7 @@ export default function App() {
                         <button className="ghost-btn" onClick={async () => { await api.post('/api/friends/' + item.id + '/respond', { accept: false }); await openMemberPanel('friends'); }}>Decline</button>
                       </div>
                     )}
-                    {memberPanel === 'notifications' && !item.read && item.id && <button className="text-link" onClick={async () => { await api.post('/api/notifications/' + item.id + '/read', {}); await openMemberPanel('notifications'); }}>Mark as read</button>}
+                    {memberPanel === 'notifications' && !item.read && item.id && <button className="text-link" onClick={async (e) => { e.stopPropagation(); await api.post('/api/notifications/' + item.id + '/read', {}); await openMemberPanel('notifications'); }}>Mark as read</button>}
                   </article>
                 )) : (
                   <div className="empty-state"><MessageCircle size={26} /><h3>No items yet</h3><p>Messages, connection requests and notifications will appear here.</p></div>
