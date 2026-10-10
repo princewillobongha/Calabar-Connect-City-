@@ -144,7 +144,10 @@ async function post(path: string, body: any) {
     const postId=path.split('/')[3];
     const {data:original,error:oe}=await supabase.from('community_posts').select('text,image_url,category').eq('id',postId).single();
     if(oe) fail(oe.message);
-    const {error}=await supabase.from('community_post_shares').upsert({post_id:postId,user_id:user.id},{onConflict:'post_id,user_id'});
+    const {data:existingShare,error:shareLookupError}=await supabase.from('community_post_shares').select('post_id').eq('post_id',postId).eq('user_id',user.id).maybeSingle();
+    if(shareLookupError) fail(shareLookupError.message);
+    if(existingShare) return {data:{ok:true,alreadyShared:true}};
+    const {error}=await supabase.from('community_post_shares').insert({post_id:postId,user_id:user.id});
     if(error) fail(error.message);
     const {data:repost,error:re}=await supabase.from('community_posts').insert({author_id:user.id,text:original.text,image_url:original.image_url,category:'Repost'}).select('id').single();
     if(re) fail(re.message);
