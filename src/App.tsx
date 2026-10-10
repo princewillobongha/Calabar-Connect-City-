@@ -362,13 +362,6 @@ export default function App() {
           >
             <Bell size={19} />
           </button>
-          <button
-            className="icon-btn"
-            aria-label="Messages"
-            onClick={() => void openMemberPanel('messages')}
-          >
-            <MessageCircle size={19} />
-          </button>
           {(user?.email||'').toLowerCase()==='princewillobongha@gmail.com' && <button className="icon-btn" aria-label="Admin verification" onClick={()=>void openAdmin()}><ShieldCheck size={19}/></button>}
           {user ? (
             <button className="profile-pill" onClick={() => void openPublicProfile(user?.userId||user?.id)}>
@@ -409,7 +402,6 @@ export default function App() {
           <button onClick={() => { setActive("Marketplace"); setMenuOpen(false); setNotice(saved.length ? "Your saved items are marked with a heart in the marketplace." : "Tap the heart on any marketplace listing to save it."); }}>Saved items ({saved.length}) <Heart size={16}/></button>
           <button onClick={() => { setShowCart(true); setMenuOpen(false); }}>Shopping cart ({cart.length}) <ShoppingCart size={16}/></button>
           <button onClick={() => { setShowPeople(true); setMenuOpen(false); }}>Find people <UserRound size={16}/></button>
-          <button onClick={() => { void openMemberPanel('messages'); setMenuOpen(false); }}>Messages <MessageCircle size={16}/></button>
           {(user?.email||'').toLowerCase()==='princewillobongha@gmail.com' && <button onClick={() => { void openAdmin(); setMenuOpen(false); }}>Admin verification <ShieldCheck size={16}/></button>}
         </div>
       )}
