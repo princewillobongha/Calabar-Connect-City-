@@ -1122,7 +1122,7 @@ export default function App() {
             </button>
             <img
               className="modal-logo"
-              src="/calabar-connect-city-logo.png"
+              src="/calabar-connect-city-logo.jpg"
               alt="Calabar Connect City"
             />
             <span className="eyebrow muted">WELCOME TO YOUR CITY</span>
