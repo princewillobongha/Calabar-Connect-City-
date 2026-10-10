@@ -35,7 +35,7 @@ const normalizeWhatsApp = (input: string): string => {
   if(digits.length<10||digits.length>15) return '';
   return 'https://wa.me/'+digits;
 };
-const asItem = (x: any) => ({...x, id:x.id, vendor_id:x.vendor_id, vendor_owner_id:x.vendor?.owner_id, title:x.title, category:x.category, price: x.price_ngn ? '₦'+Number(x.price_ngn).toLocaleString('en-NG') : 'Ask for price', location:x.vendor?.address || x.vendor?.area || 'Calabar, Cross River', description:x.description || '', images:Array.isArray(x.image_urls)?x.image_urls:[], image:x.image_urls?.[0] || '', vendor:x.vendor?.business_name || 'Calabar vendor', kind:x.category || 'Product'});
+const asItem = (x: any) => ({...x, id:x.id, vendor_id:x.vendor_id, vendor_owner_id:x.vendor?.owner_id, title:x.title, category:x.category, price: x.price_ngn ? '₦'+Number(x.price_ngn).toLocaleString('en-NG') : 'Ask for price', location:x.vendor?.address || x.vendor?.area || 'Calabar, Cross River', description:x.description || '', images:Array.isArray(x.image_urls)?x.image_urls:[], image:x.image_urls?.[0] || '', vendor:x.owner_profile?.display_name || x.owner_profile?.username || x.vendor?.business_name || 'Calabar vendor', is_verified:!!x.owner_profile?.is_verified && (!x.owner_profile?.verified_until || new Date(x.owner_profile.verified_until).getTime()>Date.now()), order_count:Number(x.order_count||0), available_until:x.available_until||null, availability_note:x.availability_note||'', kind:x.category || 'Product'});
 export async function uploadImage(file: File) {
   const user = await currentUser();
   if (!file.type.startsWith('image/')) fail('Choose an image file.');
@@ -47,19 +47,30 @@ export async function uploadImage(file: File) {
 }
 async function get(path: string) {
   if (path === '/api/listings') {
-    const {data,error}=await supabase.from('listings').select('*, vendor:vendors(id,owner_id,business_name,address,area,cover_image_url)').eq('is_available',true).order('created_at',{ascending:false}).limit(100);
-    return {data:{items:ensure(data,error).map(asItem)}};
+    const {data,error}=await supabase.from('listings').select('*, vendor:vendors(id,owner_id,business_name,address,area,cover_image_url)').eq('is_available',true).or('available_until.is.null,available_until.gt.'+new Date().toISOString()).order('created_at',{ascending:false}).limit(100);
+    const rows=ensure(data,error); const ownerIds=[...new Set(rows.map((x:any)=>x.vendor?.owner_id).filter(Boolean))];
+    const {data:owners,error:ownerError}=ownerIds.length?await supabase.from('profiles').select('id,username,display_name,is_verified,verified_until').in('id',ownerIds):{data:[],error:null}; if(ownerError)fail(ownerError.message);
+    const ownerMap=new Map((owners||[]).map((p:any)=>[p.id,p]));
+    return {data:{items:rows.map((x:any)=>asItem({...x,owner_profile:ownerMap.get(x.vendor?.owner_id)}))}};
   }
   const contactMatch = path.match(/^\/api\/listings\/([^/]+)\/contact$/);
   if (contactMatch) {
-    const {data:listing,error:listingError}=await supabase.from('listings').select('vendor_id,vendor:vendors(owner_id,whatsapp_url)').eq('id',contactMatch[1]).single();
+    const customer=await currentUser();
+    const {data:listing,error:listingError}=await supabase.from('listings').select('id,title,price_ngn,vendor_id,vendor:vendors(owner_id,whatsapp_url)').eq('id',contactMatch[1]).single();
     if(listingError) fail(listingError.message);
     const ownerId=(listing as any).vendor?.owner_id;
-    const {data:profile,error:profileError}=ownerId?await supabase.from('profiles').select('whatsapp_url').eq('id',ownerId).maybeSingle():{data:null,error:null};
+    const {data:profile,error:profileError}=ownerId?await supabase.from('profiles').select('whatsapp_url,display_name,username').eq('id',ownerId).maybeSingle():{data:null,error:null};
     if(profileError) fail(profileError.message);
     const raw=String(profile?.whatsapp_url||(listing as any).vendor?.whatsapp_url||'').trim();
     const url=normalizeWhatsApp(raw);
-    if(raw&&!url) fail('Add a valid WhatsApp phone number or wa.me link in Edit profile. Nigerian numbers like 08012345678 are supported.');
+    if(!url) fail('This seller has not added a valid WhatsApp contact yet. Ask them to add it under Edit profile.');
+    if(ownerId!==customer.id) {
+      const price=(listing as any).price_ngn?('₦'+Number((listing as any).price_ngn).toLocaleString('en-NG')):'the listed price';
+      const message='Hi '+(profile?.display_name||profile?.username||'seller')+', I found your listing "'+(listing as any).title+'" on Calabar Connect City ('+price+'). I am interested. Is it available? Please share the next steps. Thank you.';
+      const {error:orderError}=await supabase.from('vendor_enquiries').insert({vendor_id:(listing as any).vendor_id,customer_id:customer.id,listing_id:(listing as any).id,message,status:'new'});
+      if(orderError) fail(orderError.message);
+      return {data:{url:url+'?text='+encodeURIComponent(message)}};
+    }
     return {data:{url}};
   }
   const groupDetailMatch=path.match(/^\/api\/groups\/(?!mine$)([^/]+)$/);
@@ -98,7 +109,7 @@ async function get(path: string) {
   if (publicProfileMatch) {
     const user=await currentUser();
     const targetId=publicProfileMatch[1];
-    const {data,error}=await supabase.from('profiles').select('id,username,display_name,full_name,avatar_url,bio,city,is_verified,created_at').eq('id',targetId).single();
+    const {data,error}=await supabase.from('profiles').select('id,username,display_name,full_name,avatar_url,bio,city,is_verified,verified_until,verified_days,created_at').eq('id',targetId).single();
     if(error) fail(error.message);
     const {data:posts,error:postError}=await supabase.from('community_posts').select('id,text,image_url,created_at,author_id,category').eq('author_id',targetId).order('created_at',{ascending:false}).limit(50);
     if(postError) fail(postError.message);
@@ -107,7 +118,8 @@ async function get(path: string) {
     const {data:follow,error:followError}=await supabase.from('community_follows').select('follower_id').eq('follower_id',user.id).eq('followed_id',targetId).maybeSingle();
     if(followError) fail(followError.message);
     const [{count:followers},{count:following}]=await Promise.all([supabase.from('community_follows').select('*',{count:'exact',head:true}).eq('followed_id',targetId),supabase.from('community_follows').select('*',{count:'exact',head:true}).eq('follower_id',targetId)]);
-    return {data:{item:{...data,followers_count:followers||0,following_count:following||0,posts:(posts||[]).map((p:any)=>({...p,like_count:(postLikes||[]).filter((x:any)=>x.post_id===p.id).length,liked_by_me:(postLikes||[]).some((x:any)=>x.post_id===p.id&&x.user_id===user.id),share_count:(postShares||[]).filter((x:any)=>x.post_id===p.id).length,shared_by_me:(postShares||[]).some((x:any)=>x.post_id===p.id&&x.user_id===user.id)}))},is_following:!!follow}};
+    const {data:ratings,error:ratingError}=await supabase.from('profile_ratings').select('rating,rater_id').eq('profile_id',targetId); if(ratingError)fail(ratingError.message); const ratingRows=ratings||[]; const ratingAverage=ratingRows.length?ratingRows.reduce((sum:number,r:any)=>sum+Number(r.rating),0)/ratingRows.length:0; const {count:orders}=await supabase.from('vendor_enquiries').select('*',{count:'exact',head:true}).eq('vendor_id', (await supabase.from('vendors').select('id').eq('owner_id',targetId).maybeSingle()).data?.id||'00000000-0000-0000-0000-000000000000');
+    return {data:{item:{...data,is_verified:!!data.is_verified&&(!data.verified_until||new Date(data.verified_until).getTime()>Date.now()),rating_average:ratingAverage,rating_count:ratingRows.length,my_rating:ratingRows.find((r:any)=>r.rater_id===user.id)?.rating||0,order_count:orders||0,followers_count:followers||0,following_count:following||0,posts:(posts||[]).map((p:any)=>({...p,like_count:(postLikes||[]).filter((x:any)=>x.post_id===p.id).length,liked_by_me:(postLikes||[]).some((x:any)=>x.post_id===p.id&&x.user_id===user.id),share_count:(postShares||[]).filter((x:any)=>x.post_id===p.id).length,shared_by_me:(postShares||[]).some((x:any)=>x.post_id===p.id&&x.user_id===user.id)}))},is_following:!!follow}};
   }
   if (path === '/api/profile') {
     const user=await currentUser();
@@ -151,7 +163,7 @@ async function get(path: string) {
   }
   if (path === '/api/admin/profiles') {
     if ((user.email||'').toLowerCase() !== 'princewillobongha@gmail.com') fail('Admin access required.');
-    const {data,error}=await supabase.from('profiles').select('id,username,display_name,avatar_url,is_verified').order('created_at',{ascending:false}).limit(200);
+    const {data,error}=await supabase.from('profiles').select('id,username,display_name,avatar_url,is_verified,verified_until,verified_days').order('created_at',{ascending:false}).limit(500);
     return {data:{items:ensure(data,error)}};
   }
   if (path === '/api/admin/reports') {
@@ -183,8 +195,9 @@ async function post(path: string, body: any) {
       if(error) fail(error.message);
     }
     const numeric=Number(String(body.price||'').replace(/[^0-9.]/g,''))||0;
-    const {data,error}=await supabase.from('listings').insert({vendor_id:vendor.id,title:body.title,description:body.description,price_ngn:numeric,image_urls:Array.isArray(body.image_urls)?body.image_urls:(body.image?[body.image]:[]),category:body.category||'Product'}).select('*, vendor:vendors(*)').single();
-    return {data:{item:asItem(ensure(data,error))}};
+    const {data,error}=await supabase.from('listings').insert({vendor_id:vendor.id,title:body.title,description:body.description,price_ngn:numeric,image_urls:Array.isArray(body.image_urls)?body.image_urls:(body.image?[body.image]:[]),category:body.category||'Product',available_until:body.available_until||null,availability_note:String(body.availability_note||'').trim()||null}).select('*, vendor:vendors(*)').single();
+    const created=ensure(data,error); const {data:ownerProfile}=await supabase.from('profiles').select('id,username,display_name,is_verified,verified_until').eq('id',user.id).maybeSingle();
+    return {data:{item:asItem({...created,owner_profile:ownerProfile})}};
   }
   const reportResolveMatch=path.match(/^\/api\/admin\/reports\/([^/]+)\/resolve$/);
   if(reportResolveMatch){
@@ -192,9 +205,11 @@ async function post(path: string, body: any) {
     const {data,error}=await supabase.from('moderation_reports').update({status:'reviewed',reviewed_at:new Date().toISOString()}).eq('id',reportResolveMatch[1]).select('*').single();
     return {data:{item:ensure(data,error)}};
   }
+  const ratingMatch=path.match(/^\/api\/profile\/([^/]+)\/rating$/);
+  if(ratingMatch){ const targetId=ratingMatch[1]; const rating=Number(body.rating); if(!Number.isInteger(rating)||rating<1||rating>5)fail('Choose a rating from 1 to 5 stars.'); if(targetId===user.id)fail('You cannot rate your own profile.'); const {data,error}=await supabase.from('profile_ratings').upsert({profile_id:targetId,rater_id:user.id,rating,updated_at:new Date().toISOString()},{onConflict:'profile_id,rater_id'}).select('*').single(); return {data:{item:ensure(data,error)}}; }
   if(path==='/api/admin/verify'){
     if ((user.email||'').toLowerCase() !== 'princewillobongha@gmail.com') fail('Admin access required.');
-    const {data,error}=await supabase.from('profiles').update({is_verified:!!body.verified,updated_at:new Date().toISOString()}).eq('id',body.user_id).select('id,is_verified').single();
+    const days=Math.max(1,Math.min(3650,Number(body.days)||30)); const verified=!!body.verified; const {data,error}=await supabase.from('profiles').update({is_verified:verified,verified_days:verified?days:null,verified_until:verified?new Date(Date.now()+days*86400000).toISOString():null,updated_at:new Date().toISOString()}).eq('id',body.user_id).select('id,is_verified,verified_days,verified_until').single();
     return {data:{item:ensure(data,error)}};
   }
   if(path==='/api/profile'){
@@ -323,7 +338,7 @@ export const auth = {
   async signIn(email?:string,password?:string,mode:'signin'|'signup'='signin'){
     if(!email||!password) throw new Error('Enter your email and password.');
     const result=mode==='signup'
-      ? await supabase.auth.signUp({email,password,options:{data:{display_name:email.split('@')[0]},emailRedirectTo:'https://calabar-connect-city.vercel.app/'}})
+      ? await supabase.auth.signUp({email,password,options:{data:{display_name:email.split('@')[0]},emailRedirectTo:'https://calabar-connect-city-omega.vercel.app/'}})
       : await supabase.auth.signInWithPassword({email,password});
     if(result.error)throw result.error;
     if(!result.data.user)throw new Error('Could not complete authentication.');
@@ -334,6 +349,8 @@ export const auth = {
 };
 async function del(path:string){
   const user=await currentUser();
+  const listingDelete=path.match(/^\/api\/listings\/([^/]+)$/);
+  if(listingDelete){const {data:listing,error:lookupError}=await supabase.from('listings').select('id,vendor_id,vendor:vendors(owner_id)').eq('id',listingDelete[1]).single();if(lookupError)fail(lookupError.message);if((listing as any).vendor?.owner_id!==user.id)fail('You can only delete your own listing.');const {error}=await supabase.from('listings').delete().eq('id',listingDelete[1]);if(error)fail(error.message);return {data:{ok:true}};}
   const groupPostDelete=path.match(/^\/api\/groups\/([^/]+)\/posts\/([^/]+)$/);
   if(groupPostDelete){const {error}=await supabase.from('community_group_posts').delete().eq('id',groupPostDelete[2]).eq('group_id',groupPostDelete[1]);if(error)fail(error.message);return {data:{ok:true}};}
   const groupMemberDelete=path.match(/^\/api\/groups\/([^/]+)\/members\/([^/]+)$/);
