@@ -1,0 +1,145 @@
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined;
+export const supabase = createClient(
+  supabaseUrl || 'https://moejannssmjupdvkcofw.supabase.co',
+  supabaseKey || 'sb_publishable_60YiAMNciYl-5UjEj0jYFA_LajRkki3',
+  { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } }
+);
+
+const fail = (message: string): never => { throw new Error(message); };
+const ensure = <T,>(data: T | null, error: any): T => { if (error) fail(error.message || 'Supabase request failed'); return data as T; };
+const currentUser = async () => {
+  const { data, error } = await supabase.auth.getUser();
+  if (error || !data.user) fail('Please sign in to continue.');
+  return data.user;
+};
+const profileName = (u: any) => u?.user_metadata?.display_name || u?.user_metadata?.full_name || u?.email?.split('@')[0] || 'Calabar Member';
+const slugify = (s: string) => s.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'local-business';
+const asItem = (x: any) => ({...x, id:x.id, title:x.title, category:x.category, price: x.price_ngn ? '₦'+Number(x.price_ngn).toLocaleString('en-NG') : 'Ask for price', location:x.vendor?.address || x.vendor?.area || 'Calabar, Cross River', description:x.description || '', image:x.image_urls?.[0] || x.vendor?.cover_image_url || '', vendor:x.vendor?.business_name || 'Calabar vendor', kind:x.category || 'Product'});
+async function get(path: string) {
+  if (path === '/api/listings') {
+    const {data,error}=await supabase.from('listings').select('*, vendor:vendors(*)').eq('is_available',true).order('created_at',{ascending:false}).limit(100);
+    return {data:{items:ensure(data,error).map(asItem)}};
+  }
+  if (path === '/api/groups') {
+    const {data,error}=await supabase.from('community_groups').select('*, group_members(count)').order('created_at',{ascending:true});
+    const items=ensure(data,error).map((g:any)=>({id:g.id,name:g.name,category:g.name.toLowerCase().includes('food')?'Food':g.name.toLowerCase().includes('fashion')?'Fashion':g.name.toLowerCase().includes('job')?'Jobs':'Marketplace',description:g.description||'',members:g.group_members?.[0]?.count||0}));
+    return {data:{items}};
+  }
+  if (path === '/api/posts') {
+    const {data,error}=await supabase.from('community_posts').select('*, author_profile:profiles!community_posts_author_id_fkey(display_name,username)').order('created_at',{ascending:false}).limit(80);
+    return {data:{items:ensure(data,error).map((p:any)=>({id:p.id,text:p.text,author:p.author_profile?.display_name||p.author_profile?.username||'Calabar Member',author_id:p.author_id,category:p.category,created_at:p.created_at}))}};
+  }
+  const user=await currentUser();
+  if (path === '/api/messages') {
+    const {data:convos,error:ce}=await supabase.from('conversations').select('id,user_a,user_b').or('user_a.eq.'+user.id+',user_b.eq.'+user.id);
+    const rows=ensure(convos,ce)||[]; if(!rows.length)return {data:{items:[]}};
+    const {data,error}=await supabase.from('messages').select('*, sender:profiles!messages_sender_id_fkey(display_name)').in('conversation_id',rows.map((x:any)=>x.id)).order('created_at',{ascending:true}).limit(300);
+    return {data:{items:ensure(data,error).map((m:any)=>{const c=rows.find((x:any)=>x.id===m.conversation_id);return {...m,text:m.body,sender_id:m.sender_id,sender_name:m.sender?.display_name||'Member',recipient_id:c?.user_a===user.id?c?.user_b:c?.user_a,read:!!m.read_at};})}};
+  }
+  if (path === '/api/friends') {
+    const {data,error}=await supabase.from('friend_requests').select('*, sender:profiles!friend_requests_sender_id_fkey(display_name,username), receiver:profiles!friend_requests_receiver_id_fkey(display_name,username)').or('sender_id.eq.'+user.id+',receiver_id.eq.'+user.id).order('created_at',{ascending:false});
+    return {data:{items:ensure(data,error).map((x:any)=>({id:x.id,from_id:x.sender_id,to_id:x.receiver_id,from_name:x.sender?.display_name||x.sender?.username||'Member',to_name:x.receiver?.display_name||x.receiver?.username||'Member',status:x.status,created_at:x.created_at}))}};
+  }
+  if (path === '/api/notifications') {
+    const {data,error}=await supabase.from('notifications').select('*').eq('user_id',user.id).order('created_at',{ascending:false}).limit(100);
+    return {data:{items:ensure(data,error).map((n:any)=>({...n,read:!!n.read_at}))}};
+  }
+  if (path === '/api/admin/reports') {
+    const {data,error}=await supabase.from('moderation_reports').select('*').order('created_at',{ascending:false}).limit(300);
+    return {data:{items:ensure(data,error)}};
+  }
+  if (path === '/api/reports/mine') {
+    const {data,error}=await supabase.from('moderation_reports').select('*').eq('reporter_id',user.id).order('created_at',{ascending:false});
+    return {data:{items:ensure(data,error)}};
+  }
+  if (path === '/api/groups/mine') {
+    const {data,error}=await supabase.from('group_members').select('*').eq('user_id',user.id);
+    return {data:{items:ensure(data,error)}};
+  }
+  fail('Unsupported API route: '+path);
+}
+async function post(path: string, body: any) {
+  const user=await currentUser();
+  if(path==='/api/listings'){
+    let {data:vendor,error:ve}=await supabase.from('vendors').select('*').eq('owner_id',user.id).maybeSingle();
+    if(ve) fail(ve.message);
+    if(!vendor){
+      const name=profileName(user);
+      const {data,error}=await supabase.from('vendors').insert({owner_id:user.id,business_name:name,slug:slugify(name)+'-'+user.id.slice(0,8),category:body.category||'General',description:body.description||'',address:body.location||'Calabar, Cross River',area:body.location||'Calabar'}).select('*').single();
+      vendor=ensure(data,error);
+    }
+    const numeric=Number(String(body.price||'').replace(/[^0-9.]/g,''))||0;
+    const {data,error}=await supabase.from('listings').insert({vendor_id:vendor.id,title:body.title,description:body.description,price_ngn:numeric,image_urls:body.image?[body.image]:[],category:body.category||'Product'}).select('*, vendor:vendors(*)').single();
+    return {data:{item:asItem(ensure(data,error))}};
+  }
+  if(path==='/api/posts'){
+    const {data,error}=await supabase.from('community_posts').insert({author_id:user.id,text:body.text,category:body.category||'Community'}).select('*, author_profile:profiles!community_posts_author_id_fkey(display_name,username)').single();
+    const p=ensure(data,error);return {data:{item:{id:p.id,text:p.text,author:p.author_profile?.display_name||profileName(user),author_id:p.author_id,category:p.category,created_at:p.created_at}}};
+  }
+  if(path.startsWith('/api/groups/')&&path.endsWith('/join')){
+    const id=path.split('/')[3];
+    const {error}=await supabase.from('group_members').upsert({group_id:id,user_id:user.id,role:'member',status:'active'},{onConflict:'group_id,user_id'});
+    if(error) fail(error.message);return {data:{ok:true}};
+  }
+  if(path==='/api/messages'){
+    const recipient=String(body.recipient_id||'').trim();
+    if(!recipient||recipient===user.id) fail('Choose another member ID.');
+    const [a,b]=[user.id,recipient].sort();
+    let {data:conversation,error:ce}=await supabase.from('conversations').select('*').eq('user_a',a).eq('user_b',b).maybeSingle();
+    if(ce) fail(ce.message);
+    if(!conversation){const {data,error}=await supabase.from('conversations').insert({user_a:a,user_b:b}).select('*').single();conversation=ensure(data,error);}
+    const {data,error}=await supabase.from('messages').insert({conversation_id:conversation.id,sender_id:user.id,body:body.text}).select('*').single();
+    const m=ensure(data,error);
+    await supabase.from('notifications').insert({user_id:recipient,actor_id:user.id,kind:'message',title:'New message',body:'You received a new community message.'});
+    return {data:{item:{...m,text:m.body,sender_id:user.id,sender_name:profileName(user),recipient_id:recipient,read:false}}};
+  }
+  if(path==='/api/friends/request'){
+    const to=String(body.to_id||'').trim(); if(!to||to===user.id) fail('Choose another member.');
+    const {data:existing,error:ee}=await supabase.from('friend_requests').select('*').or('and(sender_id.eq.'+user.id+',receiver_id.eq.'+to+'),and(sender_id.eq.'+to+',receiver_id.eq.'+user.id+')').maybeSingle();
+    if(ee) fail(ee.message);if(existing)return {data:{item:existing}};
+    const {data,error}=await supabase.from('friend_requests').insert({sender_id:user.id,receiver_id:to}).select('*').single();
+    const req=ensure(data,error);
+    await supabase.from('notifications').insert({user_id:to,actor_id:user.id,kind:'friend_request',title:'Connection request',body:'Someone wants to connect with you.'});
+    return {data:{item:{id:req.id,from_id:req.sender_id,to_id:req.receiver_id,status:req.status,created_at:req.created_at}}};
+  }
+  const match=path.match(/^\/api\/friends\/([^/]+)\/respond$/);
+  if(match){
+    const accept=!!body.accept;
+    const {data,error}=await supabase.from('friend_requests').update({status:accept?'accepted':'declined',updated_at:new Date().toISOString()}).eq('id',match[1]).eq('receiver_id',user.id).select('*').single();
+    const req=ensure(data,error);
+    if(accept){await supabase.from('friendships').upsert({user_a:[req.sender_id,req.receiver_id].sort()[0],user_b:[req.sender_id,req.receiver_id].sort()[1]},{onConflict:'user_a,user_b'});}
+    return {data:{ok:true,status:req.status}};
+  }
+  const notification=path.match(/^\/api\/notifications\/([^/]+)\/read$/);
+  if(notification){
+    const {error}=await supabase.from('notifications').update({read_at:new Date().toISOString()}).eq('id',notification[1]).eq('user_id',user.id);
+    if(error) fail(error.message);return {data:{ok:true}};
+  }
+  if(path==='/api/reports'){
+    const {data,error}=await supabase.from('moderation_reports').insert({reporter_id:user.id,target_type:body.target_type||'community_content',target_id:body.target_id||null,reason:body.reason,details:body.details||''}).select('*').single();
+    return {data:{item:ensure(data,error)}};
+  }
+  fail('Unsupported API route: '+path);
+}
+export const auth = {
+  async getUser(){
+    const {data}=await supabase.auth.getUser();
+    if(!data.user)return null;
+    return {userId:data.user.id,email:data.user.email,name:profileName(data.user),...data.user};
+  },
+  async signIn(email?:string,password?:string,mode:'signin'|'signup'='signin'){
+    if(!email||!password) throw new Error('Enter your email and password.');
+    const result=mode==='signup'
+      ? await supabase.auth.signUp({email,password,options:{data:{display_name:email.split('@')[0]}}})
+      : await supabase.auth.signInWithPassword({email,password});
+    if(result.error)throw result.error;
+    if(!result.data.user)throw new Error('Could not complete authentication.');
+    if(mode==='signup'&&!result.data.session) return {user:{userId:result.data.user.id,email:result.data.user.email,name:profileName(result.data.user)},confirmationRequired:true};
+    return {user:{userId:result.data.user.id,email:result.data.user.email,name:profileName(result.data.user)}};
+  },
+  async signOut(){const {error}=await supabase.auth.signOut();if(error)throw error;}
+};
+export const api = { get, post };
