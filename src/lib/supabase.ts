@@ -51,7 +51,7 @@ async function get(path: string) {
     }
     return {data:{url}};
   }
-  const groupDetailMatch=path.match(/^\/api\/groups\/([^/]+)$/);
+  const groupDetailMatch=path.match(/^\/api\/groups\/(?!mine$)([^/]+)$/);
   if(groupDetailMatch){
     const groupId=groupDetailMatch[1];
     const {data:group,error:groupError}=await supabase.from('community_groups').select('*').eq('id',groupId).single();
