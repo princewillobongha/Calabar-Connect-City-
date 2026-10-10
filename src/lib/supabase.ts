@@ -56,13 +56,17 @@ async function get(path: string) {
     const groupId=groupDetailMatch[1];
     const {data:group,error:groupError}=await supabase.from('community_groups').select('*').eq('id',groupId).single();
     if(groupError) fail(groupError.message);
-    const {data:posts,error:postsError}=await supabase.from('community_group_posts').select('*, author_profile:profiles!community_group_posts_author_id_fkey(id,username,display_name,avatar_url,is_verified)').eq('group_id',groupId).order('created_at',{ascending:false}).limit(100);
+    const {data:posts,error:postsError}=await supabase.from('community_group_posts').select('*').eq('group_id',groupId).order('created_at',{ascending:false}).limit(100);
     if(postsError) fail(postsError.message);
-    const {data:memberRows,error:membersError}=await supabase.from('group_members').select('user_id,role,status,joined_at,profile:profiles!group_members_user_id_fkey(id,username,display_name,avatar_url)').eq('group_id',groupId).eq('status','active');
+    const {data:memberRows,error:membersError}=await supabase.from('group_members').select('user_id,role,status,joined_at').eq('group_id',groupId).eq('status','active');
     if(membersError) fail(membersError.message);
+    const ids=[...new Set([...(posts||[]).map((p:any)=>p.author_id),...(memberRows||[]).map((m:any)=>m.user_id)])];
+    const {data:profiles,error:profilesError}=ids.length?await supabase.from('profiles').select('id,username,display_name,avatar_url,is_verified').in('id',ids):{data:[],error:null};
+    if(profilesError) fail(profilesError.message);
     const {data:{user:viewer}}=await supabase.auth.getUser();
     const isMember=!!viewer&&(memberRows||[]).some((m:any)=>m.user_id===viewer.id);
-    return {data:{item:{...group,members:(memberRows||[]).length,is_member:isMember,is_owner:!!viewer&&group.owner_id===viewer.id,posts:(posts||[]).map((p:any)=>({...p,author:p.author_profile?.display_name||p.author_profile?.username||'Calabar member',avatar_url:p.author_profile?.avatar_url||null,is_verified:!!p.author_profile?.is_verified})),member_list:(memberRows||[]).map((m:any)=>({...m,profile:m.profile||{}}))}}};
+    const profileMap=new Map((profiles||[]).map((p:any)=>[p.id,p]));
+    return {data:{item:{...group,members:(memberRows||[]).length,is_member:isMember,is_owner:!!viewer&&group.owner_id===viewer.id,posts:(posts||[]).map((p:any)=>{const a:any=profileMap.get(p.author_id)||{};return {...p,author:a.display_name||a.username||'Calabar member',avatar_url:a.avatar_url||null,is_verified:!!a.is_verified};}),member_list:(memberRows||[]).map((m:any)=>({...m,profile:profileMap.get(m.user_id)||{}}))}}};
   }
   if (path === '/api/groups') {
     const {data,error}=await supabase.from('community_groups').select('*').eq('visibility','public').order('created_at',{ascending:false});
@@ -87,16 +91,19 @@ async function get(path: string) {
     if(error) fail(error.message);
     const {data:posts,error:postError}=await supabase.from('community_posts').select('id,text,image_url,created_at,author_id,category').eq('author_id',targetId).order('created_at',{ascending:false}).limit(50);
     if(postError) fail(postError.message);
+    const postIds=(posts||[]).map((p:any)=>p.id);
+    const [{data:postLikes},{data:postShares}]=await Promise.all([postIds.length?supabase.from('community_post_reactions').select('post_id,user_id').in('post_id',postIds):Promise.resolve({data:[]}),postIds.length?supabase.from('community_post_shares').select('post_id,user_id').in('post_id',postIds):Promise.resolve({data:[]})]);
     const {data:follow,error:followError}=await supabase.from('community_follows').select('follower_id').eq('follower_id',user.id).eq('followed_id',targetId).maybeSingle();
     if(followError) fail(followError.message);
     const [{count:followers},{count:following}]=await Promise.all([supabase.from('community_follows').select('*',{count:'exact',head:true}).eq('followed_id',targetId),supabase.from('community_follows').select('*',{count:'exact',head:true}).eq('follower_id',targetId)]);
-    return {data:{item:{...data,followers_count:followers||0,following_count:following||0,posts:posts||[]},is_following:!!follow}};
+    return {data:{item:{...data,followers_count:followers||0,following_count:following||0,posts:(posts||[]).map((p:any)=>({...p,like_count:(postLikes||[]).filter((x:any)=>x.post_id===p.id).length,liked_by_me:(postLikes||[]).some((x:any)=>x.post_id===p.id&&x.user_id===user.id),share_count:(postShares||[]).filter((x:any)=>x.post_id===p.id).length,shared_by_me:(postShares||[]).some((x:any)=>x.post_id===p.id&&x.user_id===user.id)}))},is_following:!!follow}};
   }
   if (path === '/api/profile') {
     const user=await currentUser();
     const {data,error}=await supabase.from('profiles').select('*').eq('id',user.id).maybeSingle();
     if(error) fail(error.message);
-    return {data:{item:data || {id:user.id,username:user.email?.split('@')[0] || '',display_name:profileName(user),avatar_url:'',bio:''}}};
+    const [{count:followers},{count:following}]=await Promise.all([supabase.from('community_follows').select('*',{count:'exact',head:true}).eq('followed_id',user.id),supabase.from('community_follows').select('*',{count:'exact',head:true}).eq('follower_id',user.id)]);
+    return {data:{item:{...(data || {id:user.id,username:user.email?.split('@')[0] || '',display_name:profileName(user),avatar_url:'',bio:''}),followers_count:followers||0,following_count:following||0}}};
   }
   if (path.startsWith('/api/comments/')) {
     const postId=path.split('/')[3];
@@ -104,8 +111,17 @@ async function get(path: string) {
     return {data:{items:ensure(data,error)}};
   }
   if (path === '/api/posts') {
-    const {data,error}=await supabase.from('community_posts').select('*, author_profile:profiles!community_posts_author_id_fkey(display_name,username,is_verified,avatar_url)').order('created_at',{ascending:false}).limit(80);
-    return {data:{items:ensure(data,error).map((p:any)=>({id:p.id,text:p.text,image_url:p.image_url||null,author:p.author_profile?.display_name||p.author_profile?.username||'Calabar Member',author_id:p.author_id,is_verified:!!p.author_profile?.is_verified,avatar_url:p.author_profile?.avatar_url||null,category:p.category,created_at:p.created_at}))}};
+    const {data,error}=await supabase.from('community_posts').select('*').order('created_at',{ascending:false}).limit(80);
+    const rows=ensure(data,error);const ids=rows.map((p:any)=>p.author_id);const postIds=rows.map((p:any)=>p.id);
+    const [{data:profiles,error:pe},{data:likes,error:le},{data:shares,error:se},{data:comments,error:ce},{data:{user:viewer}}]=await Promise.all([
+      ids.length?supabase.from('profiles').select('id,display_name,username,avatar_url,is_verified').in('id',[...new Set(ids)]):Promise.resolve({data:[],error:null}),
+      postIds.length?supabase.from('community_post_reactions').select('post_id,user_id').in('post_id',postIds):Promise.resolve({data:[],error:null}),
+      postIds.length?supabase.from('community_post_shares').select('post_id,user_id').in('post_id',postIds):Promise.resolve({data:[],error:null}),
+      postIds.length?supabase.from('community_comments').select('post_id').in('post_id',postIds):Promise.resolve({data:[],error:null}),
+      supabase.auth.getUser()
+    ]);if(pe)fail(pe.message);if(le)fail(le.message);if(se)fail(se.message);if(ce)fail(ce.message);
+    const pm=new Map((profiles||[]).map((p:any)=>[p.id,p]));
+    return {data:{items:rows.map((p:any)=>{const a:any=pm.get(p.author_id)||{};return {id:p.id,text:p.text,image_url:p.image_url||null,author:a.display_name||a.username||'Calabar Member',author_id:p.author_id,is_verified:!!a.is_verified,avatar_url:a.avatar_url||null,category:p.category,created_at:p.created_at,like_count:(likes||[]).filter((x:any)=>x.post_id===p.id).length,liked_by_me:!!viewer&&(likes||[]).some((x:any)=>x.post_id===p.id&&x.user_id===viewer.id),share_count:(shares||[]).filter((x:any)=>x.post_id===p.id).length,shared_by_me:!!viewer&&(shares||[]).some((x:any)=>x.post_id===p.id&&x.user_id===viewer.id),comment_count:(comments||[]).filter((x:any)=>x.post_id===p.id).length}})}};
   }
   const user=await currentUser();
   if (path === '/api/messages') {
