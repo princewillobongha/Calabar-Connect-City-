@@ -100,10 +100,10 @@ async function get(path: string) {
   if (path.startsWith('/api/people')) {
     const q = new URLSearchParams(path.split('?')[1] || '').get('q') || '';
     const term=q.replace(/[%,_]/g,'').trim();
-    let builder=supabase.from('profiles').select('id,username,display_name,full_name,avatar_url,bio,city,is_verified').order('display_name').limit(100);
+    let builder=supabase.from('profiles').select('id,username,display_name,full_name,avatar_url,bio,city,is_verified,verified_until').order('display_name').limit(100);
     if(term) builder=builder.or('username.ilike.%'+term+'%,display_name.ilike.%'+term+'%,full_name.ilike.%'+term+'%');
     const {data,error}=await builder;
-    return {data:{items:ensure(data,error)}};
+    return {data:{items:ensure(data,error).map((p:any)=>({...p,is_verified:!!p.is_verified&&(!p.verified_until||new Date(p.verified_until).getTime()>Date.now()),verified_until:undefined}))}};
   }
   const publicProfileMatch = path.match(/^\/api\/profile\/([^/]+)$/);
   if (publicProfileMatch) {
@@ -164,7 +164,7 @@ async function get(path: string) {
   if (path === '/api/admin/profiles') {
     if ((user.email||'').toLowerCase() !== 'princewillobongha@gmail.com') fail('Admin access required.');
     const {data,error}=await supabase.from('profiles').select('id,username,display_name,avatar_url,is_verified,verified_until,verified_days').order('created_at',{ascending:false}).limit(500);
-    return {data:{items:ensure(data,error)}};
+    return {data:{items:ensure(data,error).map((p:any)=>({...p,is_verified:!!p.is_verified&&(!p.verified_until||new Date(p.verified_until).getTime()>Date.now())}))}};
   }
   if (path === '/api/admin/reports') {
     if ((user.email||'').toLowerCase() !== 'princewillobongha@gmail.com') fail('Admin access required.');
