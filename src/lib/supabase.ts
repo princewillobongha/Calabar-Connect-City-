@@ -133,7 +133,7 @@ export const auth = {
   async signIn(email?:string,password?:string,mode:'signin'|'signup'='signin'){
     if(!email||!password) throw new Error('Enter your email and password.');
     const result=mode==='signup'
-      ? await supabase.auth.signUp({email,password,options:{data:{display_name:email.split('@')[0]}}})
+      ? await supabase.auth.signUp({email,password,options:{data:{display_name:email.split('@')[0]},emailRedirectTo:window.location.origin}})
       : await supabase.auth.signInWithPassword({email,password});
     if(result.error)throw result.error;
     if(!result.data.user)throw new Error('Could not complete authentication.');
