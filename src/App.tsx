@@ -97,7 +97,6 @@ export default function App() {
     location: 'Calabar, Cross River',
     description: '',
     image: '',
-    whatsapp_url: '',
   });
   const [postText, setPostText] = useState('');
   const [busy, setBusy] = useState(false);
@@ -225,9 +224,9 @@ export default function App() {
   const removeGroupMember = async (member:any) => {if(!selectedGroup||!window.confirm('Remove this member from the group?'))return;try{await api.delete('/api/groups/'+selectedGroup.id+'/members/'+member.user_id);await openGroup(selectedGroup);setNotice('Member removed from the group.');}catch(e:any){setNotice(e?.message||'Could not remove this member.');}};
   const openPost = async (post:any) => {setSelectedPost(post);await loadComments(post.id);};
   const deletePost = async (post:any) => {if(!window.confirm('Delete your post? This cannot be undone.'))return;try{await api.delete('/api/posts/'+post.id);setPosts(v=>v.filter(p=>p.id!==post.id));if(selectedPost?.id===post.id)setSelectedPost(null);setNotice('Post deleted.');}catch(e:any){setNotice(e?.message||'Could not delete this post.');}};
-  const toggleReshare = async (post:any) => {if(!requireMember('Sign in to reshare posts.'))return;try{if(post.shared_by_me)await api.delete('/api/posts/'+post.id+'/share');else await api.post('/api/posts/'+post.id+'/share',{});const r=await api.get('/api/posts');setPosts(r.data?.items||[]);setNotice(post.shared_by_me?'Reshare removed.':'Post reshared.');}catch(e:any){setNotice(e?.message||'Could not update reshare.');}};
+  const toggleReshare = async (post:any) => {if(!requireMember('Sign in to reshare posts.'))return;try{if(post.shared_by_me)await api.delete('/api/posts/'+post.id+'/share');else await api.post('/api/posts/'+post.id+'/share',{});const r=await api.get('/api/posts');setPosts(r.data?.items||[]);setSelectedPost((p:any)=>p&&p.id===post.id?({...p,shared_by_me:!post.shared_by_me,share_count:Math.max(0,(p.share_count||0)+(post.shared_by_me?-1:1))}):p);setNotice(post.shared_by_me?'Reshare removed.':'Post reshared.');}catch(e:any){setNotice(e?.message||'Could not update reshare.');}};
   const toggleLike = async (post:any) => {if(!requireMember('Sign in to like posts.'))return;try{const r=await api.post('/api/posts/'+post.id+'/like',{});setPosts(v=>v.map(p=>p.id===post.id?{...p,liked_by_me:!!r.data?.liked,like_count:Math.max(0,(p.like_count||0)+(r.data?.liked?1:-1))}:p));if(selectedPost?.id===post.id)setSelectedPost((p:any)=>({...p,liked_by_me:!!r.data?.liked,like_count:Math.max(0,(p.like_count||0)+(r.data?.liked?1:-1))}));}catch(e:any){setNotice(e?.message||'Could not update like.');}};
-  const toggleFollow = async (id:string) => { if(!requireMember('follow members'))return; try { const r=await api.post('/api/follows/toggle',{followed_id:id}); setIsFollowingProfile(!!r.data?.following); setNotice(r.data?.following?'You are now following this member.':'You unfollowed this member.'); } catch(e:any) { setNotice(e?.message||'Could not update follow status.'); } };
+  const toggleFollow = async (id:string) => { if(!requireMember('follow members'))return; try { const r=await api.post('/api/follows/toggle',{followed_id:id}); const following=!!r.data?.following; setIsFollowingProfile(following); setPublicProfile((p:any)=>p&&p.id===id?({...p,followers_count:Math.max(0,(p.followers_count||0)+(following?1:-1))}):p); setNotice(following?'You are now following this member.':'You unfollowed this member.'); } catch(e:any) { setNotice(e?.message||'Could not update follow status.'); } };
   const contactSeller = async (listing:Listing) => { const popup=window.open('about:blank','_blank'); try { const r=await api.get('/api/listings/'+listing.id+'/contact'); const url=String(r.data?.url||''); if(!url) { popup?.close(); setNotice('This seller has not added a WhatsApp contact yet.'); return; } if(popup) popup.location.href=url; else window.location.href=url; } catch(e:any) { popup?.close(); setNotice(e?.message||'Could not open seller contact.'); } };
   const loadComments = async (id:string) => { setOpenComments(id); try { const r=await api.get('/api/comments/'+id); setComments(p=>({...p,[id]:r.data?.items||[]})); } catch { setNotice('Could not load replies.'); } };
   const addComment = async (id:string) => { if(!requireMember('Sign in to reply.'))return; const text=(commentText[id]||'').trim(); if(!text)return; try { await api.post('/api/comments/'+id,{text}); setCommentText(p=>({...p,[id]:''})); await loadComments(id); } catch(e:any) { setNotice(e?.message||'Could not post reply.'); } };
@@ -245,7 +244,6 @@ export default function App() {
         ...form,
         image: imageUrls[0] || '',
         image_urls: imageUrls,
-        whatsapp_url: form.whatsapp_url.trim(),
         vendor: user.name || user.email || 'Community member',
         kind: form.category,
         created_at: new Date().toISOString(),
@@ -271,7 +269,6 @@ export default function App() {
         location: 'Calabar, Cross River',
         description: '',
         image: '',
-        whatsapp_url: '',
       });
       setNotice('Your listing is published.');
     } catch (e:any) {
@@ -1153,11 +1150,6 @@ export default function App() {
                   onChange={e => setForm({ ...form, location: e.target.value })}
                   placeholder="Neighbourhood or area"
                 />
-              </label>
-              <label>
-                Seller WhatsApp link or international phone number
-                <input type="text" value={form.whatsapp_url} onChange={e=>setForm({...form,whatsapp_url:e.target.value})} placeholder="https://wa.me/234... or 234..." />
-                <small className="fine-print">Used when a buyer taps Contact seller; it is not printed on the listing.</small>
               </label>
               <label>
                 Product photos (select multiple)
