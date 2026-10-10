@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { auth, api } from './lib/supabase';
+import { auth, api, uploadImage } from './lib/supabase';
 import {
   Search,
   MapPin,
@@ -49,93 +49,8 @@ type Post = {
   created_at: string;
   category: string;
 };
-const starterListings: Listing[] = [
-  {
-    id: 'sample-1',
-    title: 'Handmade Calabar Beaded Accessories',
-    category: 'Fashion',
-    price: '₦8,500',
-    location: 'Marian Road, Calabar',
-    description:
-      'Locally crafted statement accessories for everyday looks and special occasions.',
-    image:
-      'https://images.unsplash.com/photo-1611652022419-a9419f74343d?auto=format&fit=crop&w=900&q=85',
-    vendor: 'Mimi Crafts',
-    kind: 'Product',
-  },
-  {
-    id: 'sample-2',
-    title: 'Fresh Afang Soup & Swallow',
-    category: 'Food',
-    price: '₦4,000',
-    location: 'State Housing, Calabar',
-    description:
-      'Freshly prepared local meals. Order ahead for pickup or delivery enquiries.',
-    image:
-      'https://images.unsplash.com/photo-1547592180-85f173990554?auto=format&fit=crop&w=900&q=85',
-    vendor: 'Mama Eno Kitchen',
-    kind: 'Food',
-  },
-  {
-    id: 'sample-3',
-    title: 'Classic Everyday Sneakers',
-    category: 'Fashion',
-    price: '₦32,000',
-    location: 'Watt Market area',
-    description:
-      'Clean everyday sneakers in selected sizes. Ask the seller about available sizes.',
-    image:
-      'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=900&q=85',
-    vendor: 'Fresh Kicks Calabar',
-    kind: 'Product',
-  },
-  {
-    id: 'sample-4',
-    title: 'Studio & Event Photography',
-    category: 'Services',
-    price: 'From ₦45,000',
-    location: 'Calabar Municipal',
-    description:
-      'Portraits, birthdays, business content and event coverage by appointment.',
-    image:
-      'https://images.unsplash.com/photo-1542038784456-1ea8e935640e?auto=format&fit=crop&w=900&q=85',
-    vendor: 'FrameStory Studio',
-    kind: 'Service',
-  },
-];
-const starterGroups: Group[] = [
-  {
-    id: 'g1',
-    name: 'Calabar Food Lovers',
-    category: 'Food',
-    description: 'Local dishes, restaurants, recipes and food recommendations.',
-    members: 1280,
-  },
-  {
-    id: 'g2',
-    name: 'Calabar Fashion & Style',
-    category: 'Fashion',
-    description:
-      'Discover local designers, boutiques, style tips and new drops.',
-    members: 946,
-  },
-  {
-    id: 'g3',
-    name: 'Calabar Jobs & Opportunities',
-    category: 'Jobs',
-    description:
-      'Share vacancies, gigs, internships and professional opportunities.',
-    members: 2134,
-  },
-  {
-    id: 'g4',
-    name: 'Calabar Buy & Sell',
-    category: 'Marketplace',
-    description:
-      'A community for trusted local buying, selling and service enquiries.',
-    members: 1760,
-  },
-];
+const starterListings: Listing[] = [];
+const starterGroups: Group[] = [];
 const categories = [
   { name: 'All', icon: ShoppingBag, color: 'sand' },
   { name: 'Food', icon: Utensils, color: 'peach' },
@@ -149,8 +64,8 @@ function money(value: string) {
 export default function App() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [listings, setListings] = useState<Listing[]>(starterListings);
-  const [groups, setGroups] = useState<Group[]>(starterGroups);
+  const [listings, setListings] = useState<Listing[]>([]);
+  const [groups, setGroups] = useState<Group[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
   const [saved, setSaved] = useState<string[]>([]);
   const [active, setActive] = useState('Discover');
@@ -179,6 +94,17 @@ export default function App() {
   const [authEmail, setAuthEmail] = useState('');
   const [authPassword, setAuthPassword] = useState('');
   const [authMode, setAuthMode] = useState<'signin'|'signup'>('signin');
+  const [listingImage, setListingImage] = useState<File|null>(null);
+  const [postImage, setPostImage] = useState<File|null>(null);
+  const [showProfile, setShowProfile] = useState(false);
+  const [profile, setProfile] = useState<any>({username:'',display_name:'',full_name:'',bio:'',avatar_url:''});
+  const [showGroupForm, setShowGroupForm] = useState(false);
+  const [groupName, setGroupName] = useState('');
+  const [groupDescription, setGroupDescription] = useState('');
+  const [openComments, setOpenComments] = useState<string|null>(null);
+  const [comments, setComments] = useState<Record<string,any[]>>({});
+  const [commentText, setCommentText] = useState<Record<string,string>>({});
+  const [cart, setCart] = useState<Listing[]>(() => { try { return JSON.parse(localStorage.getItem('ccc-cart') || '[]'); } catch { return []; } });
   useEffect(() => {
     let live = true;
     Promise.all([
@@ -190,15 +116,9 @@ export default function App() {
       if (!live) return;
       if (u) setUser(u);
       const remoteListings = l.data?.items || [];
-      if (remoteListings.length)
-        setListings([
-          ...remoteListings,
-          ...starterListings.filter(
-            s => !remoteListings.some((x: Listing) => x.id === s.id)
-          ),
-        ]);
+      setListings(remoteListings);
       const remoteGroups = g.data?.items || [];
-      if (remoteGroups.length) setGroups(remoteGroups);
+      setGroups(remoteGroups);
       setPosts(p.data?.items || []);
       setLoading(false);
     });
@@ -261,6 +181,11 @@ export default function App() {
     }
     return true;
   };
+  useEffect(() => { localStorage.setItem('ccc-cart', JSON.stringify(cart)); }, [cart]);
+  const saveProfile = async () => { try { const r=await api.post('/api/profile',profile); setProfile(r.data.item); setUser((u:any)=>({...u,name:r.data.item.display_name,username:r.data.item.username,avatar_url:r.data.item.avatar_url})); setShowProfile(false); setNotice('Profile saved.'); } catch(e:any) { setNotice(e?.message||'Could not save profile.'); } };
+  const loadComments = async (id:string) => { setOpenComments(id); try { const r=await api.get('/api/comments/'+id); setComments(p=>({...p,[id]:r.data?.items||[]})); } catch { setNotice('Could not load replies.'); } };
+  const addComment = async (id:string) => { if(!requireMember('Sign in to reply.'))return; const text=(commentText[id]||'').trim(); if(!text)return; try { await api.post('/api/comments/'+id,{text}); setCommentText(p=>({...p,[id]:''})); await loadComments(id); } catch(e:any) { setNotice(e?.message||'Could not post reply.'); } };
+  const createGroup = async () => { if(!requireMember('Sign in to create a group.'))return; try { const r=await api.post('/api/groups',{name:groupName,description:groupDescription}); setGroups(p=>[r.data.item,...p]); setShowGroupForm(false); setGroupName(''); setGroupDescription(''); setNotice('Group created.'); } catch(e:any) { setNotice(e?.message||'Could not create group.'); } };
   const saveListing = async () => {
     if (!requireMember('Sign in to publish a listing.')) return;
     if (!form.title.trim() || !form.description.trim()) {
@@ -269,8 +194,10 @@ export default function App() {
     }
     setBusy(true);
     try {
+      const imageUrl = listingImage ? await uploadImage(listingImage) : form.image;
       const result = await api.post('/api/listings', {
         ...form,
+        image: imageUrl,
         vendor: user.name || user.email || 'Community member',
         kind: form.category,
         created_at: new Date().toISOString(),
@@ -311,14 +238,17 @@ export default function App() {
     }
     setBusy(true);
     try {
+      const imageUrl = postImage ? await uploadImage(postImage) : null;
       const r = await api.post('/api/posts', {
         text: postText.trim(),
+        image_url: imageUrl,
         author: user.name || user.email || 'Community member',
         category: 'Community',
         created_at: new Date().toISOString(),
       });
       setPosts(prev => [r.data.item, ...prev]);
       setPostText('');
+      setPostImage(null);
       setShowPostForm(false);
       setNotice('Your community update is live.');
     } catch {
@@ -831,12 +761,12 @@ export default function App() {
                 </div>
                 <button
                   className="primary-btn"
-                  onClick={() => interact('create a group')}
+                  onClick={() => { if(requireMember('Sign in to create a group.')) setShowGroupForm(true); }}
                 >
                   <Plus size={17} /> Create a group
                 </button>
               </div>
-              <div className="group-grid">
+              {groups.length===0 ? <div className="empty-state"><Users size={28}/><h3>No groups yet</h3><p>Create the first community group.</p><button className="primary-btn" onClick={()=>setShowGroupForm(true)}>Create a group</button></div> : <div className="group-grid">
                 {groups.map((g, i) => (
                   <article className="group-card" key={g.id}>
                     <div className={'group-art art-' + i}>
@@ -918,12 +848,9 @@ export default function App() {
                             : 'Just now'}
                         </small>
                         <p>{p.text}</p>
-                        <button
-                          className="text-link"
-                          onClick={() => interact('reply to this post')}
-                        >
-                          <MessageCircle size={15} /> Reply
-                        </button>
+                        {p.image_url && <img className="post-photo" src={p.image_url} alt="Community post" />}
+                        <div className="post-actions"><button className="text-link" onClick={()=>void api.post('/api/posts/'+p.id+'/like',{}).then(()=>setNotice('Like updated.')).catch(()=>setNotice('Could not like post.'))}><Heart size={15}/> Like</button><button className="text-link" onClick={()=>openComments===p.id?setOpenComments(null):void loadComments(p.id)}><MessageCircle size={15}/> Reply</button><button className="text-link" onClick={()=>void api.post('/api/posts/'+p.id+'/share',{}).then(()=>setNotice('Post reshared.')).catch(()=>setNotice('Could not reshare post.'))}><ArrowUpRight size={15}/> Reshare</button></div>
+                        {openComments===p.id && <div className="comment-thread">{(comments[p.id]||[]).map((cm:any)=><p key={cm.id}><b>{cm.author_profile?.display_name||cm.author_profile?.username||'Member'}:</b> {cm.text}</p>)}<form onSubmit={e=>{e.preventDefault();void addComment(p.id);}}><input value={commentText[p.id]||''} onChange={e=>setCommentText(v=>({...v,[p.id]:e.target.value}))} placeholder="Write a reply..." required/><button type="submit" className="primary-btn">Reply</button></form></div>}
                       </div>
                     </article>
                   ))
@@ -1146,6 +1073,8 @@ export default function App() {
           </div>
         </div>
       )}
+      {showProfile && <div className="modal-backdrop" onClick={()=>setShowProfile(false)}><div className="modal form-modal" onClick={e=>e.stopPropagation()}><button className="modal-close" onClick={()=>setShowProfile(false)}><X size={18}/></button><h2>Edit profile</h2>{profile.avatar_url&&<img src={profile.avatar_url} className="profile-preview" alt="Profile"/>}<label>Profile picture<input type="file" accept="image/*" onChange={async e=>{const f=e.target.files?.[0];if(f)try{setProfile((p:any)=>({...p,avatar_url:await uploadImage(f)}));}catch(err:any){setNotice(err?.message||'Image upload failed.');}}}/></label><label>Username<input value={profile.username||''} onChange={e=>setProfile((p:any)=>({...p,username:e.target.value}))} required/></label><label>Display name<input value={profile.display_name||''} onChange={e=>setProfile((p:any)=>({...p,display_name:e.target.value}))} required/></label><label>Full name<input value={profile.full_name||''} onChange={e=>setProfile((p:any)=>({...p,full_name:e.target.value}))}/></label><label>Bio<textarea value={profile.bio||''} onChange={e=>setProfile((p:any)=>({...p,bio:e.target.value}))}/></label><button className="primary-btn full-btn" onClick={()=>void saveProfile()}>Save profile</button></div></div>}
+      {showGroupForm && <div className="modal-backdrop" onClick={()=>setShowGroupForm(false)}><div className="modal form-modal" onClick={e=>e.stopPropagation()}><button className="modal-close" onClick={()=>setShowGroupForm(false)}><X size={18}/></button><h2>Create a group</h2><label>Group name<input value={groupName} onChange={e=>setGroupName(e.target.value)} required/></label><label>Description<textarea value={groupDescription} onChange={e=>setGroupDescription(e.target.value)}/></label><button className="primary-btn full-btn" onClick={()=>void createGroup()}>Create group</button></div></div>}
       {showListingForm && (
         <div
           className="modal-backdrop"
@@ -1210,12 +1139,8 @@ export default function App() {
                 />
               </label>
               <label>
-                Photo URL (optional)
-                <input
-                  value={form.image}
-                  onChange={e => setForm({ ...form, image: e.target.value })}
-                  placeholder="Paste an image URL"
-                />
+                Product photo
+                <input type="file" accept="image/*" onChange={e=>setListingImage(e.target.files?.[0]||null)} />
               </label>
               <label>
                 Description
@@ -1265,6 +1190,7 @@ export default function App() {
                   placeholder="Ask a question, share a tip or recommend a local business..."
                 />
               </label>
+              <label>Attach a photo<input type="file" accept="image/*" onChange={e=>setPostImage(e.target.files?.[0]||null)} /></label>
               <button className="primary-btn full-btn" disabled={busy}>
                 {busy ? 'Publishing…' : 'Publish update'}{' '}
                 <ArrowUpRight size={16} />
