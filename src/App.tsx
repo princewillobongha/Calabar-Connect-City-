@@ -103,7 +103,7 @@ export default function App() {
   const [authEmail, setAuthEmail] = useState('');
   const [authPassword, setAuthPassword] = useState('');
   const [authMode, setAuthMode] = useState<'signin'|'signup'>('signin');
-  const [listingImage, setListingImage] = useState<File|null>(null);
+  const [listingImage, setListingImage] = useState<File[]>([]);
   const [postImage, setPostImage] = useState<File|null>(null);
   const [showProfile, setShowProfile] = useState(false);
   const [profile, setProfile] = useState<any>({username:'',display_name:'',full_name:'',bio:'',avatar_url:''});
@@ -213,10 +213,11 @@ export default function App() {
     }
     setBusy(true);
     try {
-      const imageUrl = listingImage ? await uploadImage(listingImage) : form.image;
+      const imageUrls = listingImage.length ? await Promise.all(listingImage.map(file=>uploadImage(file))) : (form.image ? [form.image] : []);
       const result = await api.post('/api/listings', {
         ...form,
-        image: imageUrl,
+        image: imageUrls[0] || '',
+        image_urls: imageUrls,
         vendor: user.name || user.email || 'Community member',
         kind: form.category,
         created_at: new Date().toISOString(),
@@ -234,7 +235,7 @@ export default function App() {
           ...prev,
         ]);
       setShowListingForm(false);
-      setListingImage(null);
+      setListingImage([]);
       setForm({
         title: '',
         category: 'Product',
@@ -1159,7 +1160,7 @@ export default function App() {
               </label>
               <label>
                 Product photo
-                <input type="file" accept="image/*" onChange={e=>setListingImage(e.target.files?.[0]||null)} />
+                <input type="file" accept="image/*" onChange={e=>setListingImage(Array.from(e.target.files||[]))} />
               </label>
               <label>
                 Description
