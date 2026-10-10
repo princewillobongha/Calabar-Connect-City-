@@ -1168,6 +1168,7 @@ export default function App() {
                   placeholder="Tell people a little more..."
                 />
               </label>
+              <p className="fine-print">Contact seller opens WhatsApp using the number or link saved in your profile. Set it under My profile before publishing.</p>
               <button className="primary-btn full-btn" disabled={busy}>
                 {busy ? 'Publishing…' : 'Publish listing'}{' '}
                 <ArrowUpRight size={16} />
