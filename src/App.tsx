@@ -99,6 +99,7 @@ export default function App() {
   const [showProfile, setShowProfile] = useState(false);
   const [profile, setProfile] = useState<any>({username:'',display_name:'',full_name:'',bio:'',avatar_url:''});
   const [showGroupForm, setShowGroupForm] = useState(false);
+  const [showCart, setShowCart] = useState(false);
   const [groupName, setGroupName] = useState('');
   const [groupDescription, setGroupDescription] = useState('');
   const [openComments, setOpenComments] = useState<string|null>(null);
@@ -348,12 +349,12 @@ export default function App() {
             <MessageCircle size={19} />
           </button>
           {user ? (
-            <button className="profile-pill" onClick={signOut}>
+            <button className="profile-pill" onClick={async () => { try { const r=await api.get("/api/profile"); setProfile(r.data?.item || {username:user?.email?.split("@")[0]||"",display_name:user?.name||"",full_name:"",bio:"",avatar_url:""}); } catch {} setShowProfile(true); }}>
               <span className="avatar">
                 {(user.name || user.email || 'M').slice(0, 1).toUpperCase()}
               </span>
               <span>{user.name || 'My account'}</span>
-              <LogOut size={15} />
+              <UserRound size={15} />
             </button>
           ) : (
             <button className="sign-in" onClick={() => setShowAuth(true)}>
@@ -383,14 +384,10 @@ export default function App() {
               <ChevronRight size={16} />
             </button>
           ))}
-          <button
-            onClick={() => {
-              setShowListingForm(true);
-              setMenuOpen(false);
-            }}
-          >
-            List a business or item <Plus size={16} />
-          </button>
+          <button onClick={() => { setShowListingForm(true); setMenuOpen(false); }}>List a business or item <Plus size={16} /></button>
+          <button onClick={async () => { if(!user){setShowAuth(true);return;} try {const r=await api.get('/api/profile');setProfile(r.data?.item||{username:user?.email?.split('@')[0]||'',display_name:user?.name||'',full_name:'',bio:'',avatar_url:''});}catch{} setShowProfile(true);setMenuOpen(false);}}>My profile <UserRound size={16}/></button>
+          <button onClick={() => { setShowCart(true); setMenuOpen(false); }}>Shopping cart ({cart.length}) <ShoppingCart size={16}/></button>
+          <button onClick={() => { void openMemberPanel('messages'); setMenuOpen(false); }}>Messages <MessageCircle size={16}/></button>
         </div>
       )}
       <div className="page-wrap">
@@ -1073,6 +1070,7 @@ export default function App() {
           </div>
         </div>
       )}
+      {showCart && <div className="modal-backdrop" onClick={()=>setShowCart(false)}><div className="modal form-modal" onClick={e=>e.stopPropagation()}><button className="modal-close" onClick={()=>setShowCart(false)}><X size={18}/></button><h2>Your cart</h2>{cart.length===0?<div className="empty-state"><ShoppingCart size={26}/><h3>Your cart is empty</h3><p>Open a marketplace item and add it to your cart.</p></div>:<>{cart.map((item,i)=><div className="cart-row" key={item.id+'-'+i}>{item.image&&<img src={item.image} alt={item.title}/>}<div><b>{item.title}</b><p>{item.price}</p></div><button className="text-link" onClick={()=>setCart(v=>v.filter((_,idx)=>idx!==i))}>Remove</button></div>)}<button className="primary-btn full-btn" onClick={()=>{setShowCart(false);setNotice('Cart items are saved on this device. Contact the seller from each listing to arrange your order.');}}>Continue</button></>}</div></div>}
       {showProfile && <div className="modal-backdrop" onClick={()=>setShowProfile(false)}><div className="modal form-modal" onClick={e=>e.stopPropagation()}><button className="modal-close" onClick={()=>setShowProfile(false)}><X size={18}/></button><h2>Edit profile</h2>{profile.avatar_url&&<img src={profile.avatar_url} className="profile-preview" alt="Profile"/>}<label>Profile picture<input type="file" accept="image/*" onChange={async e=>{const f=e.target.files?.[0];if(f)try{setProfile((p:any)=>({...p,avatar_url:await uploadImage(f)}));}catch(err:any){setNotice(err?.message||'Image upload failed.');}}}/></label><label>Username<input value={profile.username||''} onChange={e=>setProfile((p:any)=>({...p,username:e.target.value}))} required/></label><label>Display name<input value={profile.display_name||''} onChange={e=>setProfile((p:any)=>({...p,display_name:e.target.value}))} required/></label><label>Full name<input value={profile.full_name||''} onChange={e=>setProfile((p:any)=>({...p,full_name:e.target.value}))}/></label><label>Bio<textarea value={profile.bio||''} onChange={e=>setProfile((p:any)=>({...p,bio:e.target.value}))}/></label><button className="primary-btn full-btn" onClick={()=>void saveProfile()}>Save profile</button></div></div>}
       {showGroupForm && <div className="modal-backdrop" onClick={()=>setShowGroupForm(false)}><div className="modal form-modal" onClick={e=>e.stopPropagation()}><button className="modal-close" onClick={()=>setShowGroupForm(false)}><X size={18}/></button><h2>Create a group</h2><label>Group name<input value={groupName} onChange={e=>setGroupName(e.target.value)} required/></label><label>Description<textarea value={groupDescription} onChange={e=>setGroupDescription(e.target.value)}/></label><button className="primary-btn full-btn" onClick={()=>void createGroup()}>Create group</button></div></div>}
       {showListingForm && (
@@ -1236,6 +1234,7 @@ export default function App() {
               <Store size={16} />
               {selectedListing.vendor || 'Local vendor'}
             </div>
+            <button className="ghost-btn full-btn" onClick={() => { if(requireMember('add items to your cart')) { setCart(v=>[...v,selectedListing]); setNotice('Added to cart.'); } }}>Add to cart <ShoppingCart size={16}/></button>
             <button
               className="primary-btn full-btn"
               onClick={() => interact('contact this vendor')}
