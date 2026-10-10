@@ -846,9 +846,7 @@ export default function App() {
                 {posts.length ? (
                   posts.map(p => (
                     <article className="feed-card" key={p.id}>
-                      <div className="feed-avatar">
-                        {(p.author || 'C').slice(0, 1).toUpperCase()}
-                      </div>
+                      <div className="feed-avatar">{p.avatar_url ? <img src={p.avatar_url} alt="" /> : (p.author || 'C').slice(0, 1).toUpperCase()}</div>
                       <div>
                         <b>{p.author || 'Community member'} {p.is_verified && <BadgeCheck size={16} className="verified-badge" aria-label="Verified account"/>}</b>
                         <small>
