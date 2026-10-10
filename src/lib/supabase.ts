@@ -103,7 +103,7 @@ async function post(path: string, body: any) {
       vendor=ensure(data,error);
     }
     const numeric=Number(String(body.price||'').replace(/[^0-9.]/g,''))||0;
-    const {data,error}=await supabase.from('listings').insert({vendor_id:vendor.id,title:body.title,description:body.description,price_ngn:numeric,image_urls:body.image?[body.image]:[],category:body.category||'Product'}).select('*, vendor:vendors(*)').single();
+    const {data,error}=await supabase.from('listings').insert({vendor_id:vendor.id,title:body.title,description:body.description,price_ngn:numeric,image_urls:Array.isArray(body.image_urls)?body.image_urls:(body.image?[body.image]:[]),category:body.category||'Product'}).select('*, vendor:vendors(*)').single();
     return {data:{item:asItem(ensure(data,error))}};
   }
   if(path==='/api/admin/verify'){
@@ -147,7 +147,7 @@ async function post(path: string, body: any) {
   }
   if(path==='/api/posts'){
     const {data,error}=await supabase.from('community_posts').insert({author_id:user.id,text:body.text,image_url:body.image_url||null,category:body.category||'Community'}).select('*, author_profile:profiles!community_posts_author_id_fkey(display_name,username)').single();
-    const p=ensure(data,error);return {data:{item:{id:p.id,text:p.text,author:p.author_profile?.display_name||profileName(user),author_id:p.author_id,category:p.category,created_at:p.created_at}}};
+    const p=ensure(data,error);return {data:{item:{id:p.id,text:p.text,image_url:p.image_url||null,author:p.author_profile?.display_name||profileName(user),author_id:p.author_id,category:p.category,created_at:p.created_at}}};
   }
   if(path.startsWith('/api/groups/')&&path.endsWith('/join')){
     const id=path.split('/')[3];
