@@ -17,7 +17,7 @@ const currentUser = async () => {
 };
 const profileName = (u: any) => u?.user_metadata?.display_name || u?.user_metadata?.full_name || u?.email?.split('@')[0] || 'Calabar Member';
 const slugify = (s: string) => s.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'local-business';
-const asItem = (x: any) => ({...x, id:x.id, title:x.title, category:x.category, price: x.price_ngn ? '₦'+Number(x.price_ngn).toLocaleString('en-NG') : 'Ask for price', location:x.vendor?.address || x.vendor?.area || 'Calabar, Cross River', description:x.description || '', images:Array.isArray(x.image_urls)?x.image_urls:[], image:x.image_urls?.[0] || x.vendor?.cover_image_url || '', vendor:x.vendor?.business_name || 'Calabar vendor', kind:x.category || 'Product'});
+const asItem = (x: any) => ({...x, id:x.id, vendor_id:x.vendor_id, vendor_owner_id:x.vendor?.owner_id, title:x.title, category:x.category, price: x.price_ngn ? '₦'+Number(x.price_ngn).toLocaleString('en-NG') : 'Ask for price', location:x.vendor?.address || x.vendor?.area || 'Calabar, Cross River', description:x.description || '', images:Array.isArray(x.image_urls)?x.image_urls:[], image:x.image_urls?.[0] || x.vendor?.cover_image_url || '', vendor:x.vendor?.business_name || 'Calabar vendor', kind:x.category || 'Product'});
 export async function uploadImage(file: File) {
   const user = await currentUser();
   if (!file.type.startsWith('image/')) fail('Choose an image file.');
@@ -29,41 +29,68 @@ export async function uploadImage(file: File) {
 }
 async function get(path: string) {
   if (path === '/api/listings') {
-    const {data,error}=await supabase.from('listings').select('*, vendor:vendors(id,business_name,address,area,cover_image_url)').eq('is_available',true).order('created_at',{ascending:false}).limit(100);
+    const {data,error}=await supabase.from('listings').select('*, vendor:vendors(id,owner_id,business_name,address,area,cover_image_url)').eq('is_available',true).order('created_at',{ascending:false}).limit(100);
     return {data:{items:ensure(data,error).map(asItem)}};
   }
   const contactMatch = path.match(/^\/api\/listings\/([^/]+)\/contact$/);
   if (contactMatch) {
-    const {data:listing,error:listingError}=await supabase.from('listings').select('vendor_id').eq('id',contactMatch[1]).single();
+    const {data:listing,error:listingError}=await supabase.from('listings').select('vendor_id,vendor:vendors(owner_id,whatsapp_url)').eq('id',contactMatch[1]).single();
     if(listingError) fail(listingError.message);
-    const {data:vendor,error}=await supabase.from('vendors').select('whatsapp_url').eq('id',listing.vendor_id).maybeSingle();
-    if(error) fail(error.message);
-    let url=String(vendor?.whatsapp_url||'').trim();
-    if(url && /^\+?[0-9\s()-]+$/.test(url)) url='https://wa.me/'+url.replace(/\D/g,'');
-    if(url && !/^https:\/\/(wa\.me\/|api\.whatsapp\.com\/)/i.test(url)) fail('Seller WhatsApp contact is not a valid WhatsApp link.');
+    const ownerId=(listing as any).vendor?.owner_id;
+    const {data:profile,error:profileError}=ownerId?await supabase.from('profiles').select('whatsapp_url').eq('id',ownerId).maybeSingle():{data:null,error:null};
+    if(profileError) fail(profileError.message);
+    let raw=String((listing as any).vendor?.whatsapp_url||profile?.whatsapp_url||'').trim();
+    let url='';
+    if(raw){
+      const digits=raw.replace(/\D/g,'');
+      if(/^\+?[0-9\s().-]+$/.test(raw) && digits.length>=10 && digits.length<=15) url='https://wa.me/'+digits;
+      else if(/^https?:\/\/(wa\.me\/|api\.whatsapp\.com\/)/i.test(raw)) url=raw.replace(/^http:/i,'https:');
+      else if(/^(wa\.me\/|api\.whatsapp\.com\/)/i.test(raw)) url='https://'+raw;
+      else if(/^\d{10,15}$/.test(digits) && !/[a-z]/i.test(raw)) url='https://wa.me/'+digits;
+      else fail('Add a WhatsApp phone number with country code (for example +2348012345678) or a wa.me link in Edit profile.');
+    }
     return {data:{url}};
   }
+  const groupDetailMatch=path.match(/^\/api\/groups\/([^/]+)$/);
+  if(groupDetailMatch){
+    const groupId=groupDetailMatch[1];
+    const {data:group,error:groupError}=await supabase.from('community_groups').select('*').eq('id',groupId).single();
+    if(groupError) fail(groupError.message);
+    const {data:posts,error:postsError}=await supabase.from('community_group_posts').select('*, author_profile:profiles!community_group_posts_author_id_fkey(id,username,display_name,avatar_url,is_verified)').eq('group_id',groupId).order('created_at',{ascending:false}).limit(100);
+    if(postsError) fail(postsError.message);
+    const {data:memberRows,error:membersError}=await supabase.from('group_members').select('user_id,role,status,joined_at,profile:profiles!group_members_user_id_fkey(id,username,display_name,avatar_url)').eq('group_id',groupId).eq('status','active');
+    if(membersError) fail(membersError.message);
+    const {data:{user:viewer}}=await supabase.auth.getUser();
+    const isMember=!!viewer&&(memberRows||[]).some((m:any)=>m.user_id===viewer.id);
+    return {data:{item:{...group,members:(memberRows||[]).length,is_member:isMember,is_owner:!!viewer&&group.owner_id===viewer.id,posts:(posts||[]).map((p:any)=>({...p,author:p.author_profile?.display_name||p.author_profile?.username||'Calabar member',avatar_url:p.author_profile?.avatar_url||null,is_verified:!!p.author_profile?.is_verified})),member_list:(memberRows||[]).map((m:any)=>({...m,profile:m.profile||{}}))}}};
+  }
   if (path === '/api/groups') {
-    const {data,error}=await supabase.from('community_groups').select('*').eq('visibility','public').order('created_at',{ascending:true});
-    const items=ensure(data,error).map((g:any)=>({id:g.id,name:g.name,category:g.name.toLowerCase().includes('food')?'Food':g.name.toLowerCase().includes('fashion')?'Fashion':g.name.toLowerCase().includes('job')?'Jobs':'Community',description:g.description||'',members:0}));
+    const {data,error}=await supabase.from('community_groups').select('*').eq('visibility','public').order('created_at',{ascending:false});
+    const rows=ensure(data,error);
+    const {data:memberRows}=await supabase.from('group_members').select('group_id').eq('status','active');
+    const items=rows.map((g:any)=>({id:g.id,name:g.name,avatar_url:g.avatar_url||null,owner_id:g.owner_id,category:g.name.toLowerCase().includes('food')?'Food':g.name.toLowerCase().includes('fashion')?'Fashion':g.name.toLowerCase().includes('job')?'Jobs':'Community',description:g.description||'',members:(memberRows||[]).filter((m:any)=>m.group_id===g.id).length}));
     return {data:{items}};
   }
   if (path.startsWith('/api/people')) {
     const q = new URLSearchParams(path.split('?')[1] || '').get('q') || '';
-    const {data,error}=await supabase.from('profiles').select('id,username,display_name,avatar_url,bio,is_verified').ilike('username','%'+q.replace(/[%_]/g,'')+'%').limit(30);
+    const term=q.replace(/[%,_]/g,'').trim();
+    let builder=supabase.from('profiles').select('id,username,display_name,full_name,avatar_url,bio,city,is_verified').order('display_name').limit(100);
+    if(term) builder=builder.or('username.ilike.%'+term+'%,display_name.ilike.%'+term+'%,full_name.ilike.%'+term+'%');
+    const {data,error}=await builder;
     return {data:{items:ensure(data,error)}};
   }
   const publicProfileMatch = path.match(/^\/api\/profile\/([^/]+)$/);
   if (publicProfileMatch) {
     const user=await currentUser();
     const targetId=publicProfileMatch[1];
-    const {data,error}=await supabase.from('profiles').select('id,username,display_name,full_name,avatar_url,bio,is_verified,created_at').eq('id',targetId).single();
+    const {data,error}=await supabase.from('profiles').select('id,username,display_name,full_name,avatar_url,bio,city,is_verified,created_at,whatsapp_url').eq('id',targetId).single();
     if(error) fail(error.message);
-    const {data:posts,error:postError}=await supabase.from('community_posts').select('id,text,image_url,created_at').eq('author_id',targetId).order('created_at',{ascending:false}).limit(30);
+    const {data:posts,error:postError}=await supabase.from('community_posts').select('id,text,image_url,created_at,author_id,category').eq('author_id',targetId).order('created_at',{ascending:false}).limit(50);
     if(postError) fail(postError.message);
     const {data:follow,error:followError}=await supabase.from('community_follows').select('follower_id').eq('follower_id',user.id).eq('followed_id',targetId).maybeSingle();
     if(followError) fail(followError.message);
-    return {data:{item:{...data,posts:posts||[]},is_following:!!follow}};
+    const [{count:followers},{count:following}]=await Promise.all([supabase.from('community_follows').select('*',{count:'exact',head:true}).eq('followed_id',targetId),supabase.from('community_follows').select('*',{count:'exact',head:true}).eq('follower_id',targetId)]);
+    return {data:{item:{...data,followers_count:followers||0,following_count:following||0,posts:posts||[]},is_following:!!follow}};
   }
   if (path === '/api/profile') {
     const user=await currentUser();
@@ -110,8 +137,8 @@ async function get(path: string) {
     return {data:{items:ensure(data,error)}};
   }
   if (path === '/api/groups/mine') {
-    const {data,error}=await supabase.from('group_members').select('*').eq('user_id',user.id);
-    return {data:{items:ensure(data,error)}};
+    const {data,error}=await supabase.from('group_members').select('group_id,role,status,group:community_groups(id,name,description,avatar_url,owner_id)').eq('user_id',user.id).eq('status','active');
+    return {data:{items:ensure(data,error).map((m:any)=>({...m.group,role:m.role,status:m.status}))}};
   }
   fail('Unsupported API route: '+path);
 }
@@ -146,7 +173,10 @@ async function post(path: string, body: any) {
   if(path==='/api/profile'){
     const username=String(body.username||'').trim().toLowerCase().replace(/^@/,'');
     if(!/^[a-z0-9_.]{3,24}$/.test(username)) fail('Username must be 3–24 characters using letters, numbers, dots or underscores.');
-    const {data,error}=await supabase.from('profiles').upsert({id:user.id,username,display_name:String(body.display_name||'').trim()||username,full_name:String(body.full_name||'').trim()||null,bio:String(body.bio||'').trim(),avatar_url:body.avatar_url||null,updated_at:new Date().toISOString()},{onConflict:'id'}).select('*').single();
+    let whatsapp=String(body.whatsapp_url||'').trim();
+    if(whatsapp && /^\+?[0-9\s().-]+$/.test(whatsapp)){const digits=whatsapp.replace(/\D/g,'');if(digits.length<10||digits.length>15)fail('WhatsApp number must include the country code.');whatsapp='https://wa.me/'+digits;}
+    if(whatsapp && !/^https:\/\/(wa\.me\/|api\.whatsapp\.com\/)/i.test(whatsapp)) fail('Enter a WhatsApp number with country code or a wa.me link.');
+    const {data,error}=await supabase.from('profiles').upsert({id:user.id,username,display_name:String(body.display_name||'').trim()||username,full_name:String(body.full_name||'').trim()||null,bio:String(body.bio||'').trim(),avatar_url:body.avatar_url||null,city:String(body.city||body.location||'Calabar').trim()||'Calabar',whatsapp_url:whatsapp||null,updated_at:new Date().toISOString()},{onConflict:'id'}).select('*').single();
     return {data:{item:ensure(data,error)}};
   }
   if(path==='/api/follows/toggle'){
@@ -161,11 +191,22 @@ async function post(path: string, body: any) {
     const name=String(body.name||'').trim();
     if(name.length<3) fail('Group name must be at least 3 characters.');
     const slug=slugify(name)+'-'+user.id.slice(0,6);
-    const {data,error}=await supabase.from('community_groups').insert({owner_id:user.id,name,slug,description:String(body.description||'').trim(),visibility:body.visibility==='private'?'private':'public'}).select('*').single();
+    const {data,error}=await supabase.from('community_groups').insert({owner_id:user.id,name,slug,description:String(body.description||'').trim(),avatar_url:body.avatar_url||null,visibility:body.visibility==='private'?'private':'public'}).select('*').single();
     const group=ensure(data,error);
     const {error:memberError}=await supabase.from('group_members').insert({group_id:group.id,user_id:user.id,role:'owner',status:'active'});
     if(memberError) fail('Group was created but membership could not be added: '+memberError.message);
-    return {data:{item:{id:group.id,name:group.name,description:group.description||'',members:1,category:'Community'}}};
+    return {data:{item:{id:group.id,name:group.name,description:group.description||'',avatar_url:group.avatar_url||null,owner_id:group.owner_id,members:1,category:'Community'}}};
+  }
+  const groupPostMatch=path.match(/^\/api\/groups\/([^/]+)\/posts$/);
+  if(groupPostMatch){
+    const text=String(body.text||'').trim();if(!text)fail('Write something before posting in the group.');
+    const {data,error}=await supabase.from('community_group_posts').insert({group_id:groupPostMatch[1],author_id:user.id,text,image_url:body.image_url||null}).select('*, author_profile:profiles!community_group_posts_author_id_fkey(id,username,display_name,avatar_url,is_verified)').single();
+    const p=ensure(data,error);return {data:{item:{...p,author:p.author_profile?.display_name||p.author_profile?.username||'Calabar member',avatar_url:p.author_profile?.avatar_url||null,is_verified:!!p.author_profile?.is_verified}}};
+  }
+  const groupUpdateMatch=path.match(/^\/api\/groups\/([^/]+)\/update$/);
+  if(groupUpdateMatch){
+    const {data,error}=await supabase.from('community_groups').update({avatar_url:body.avatar_url||null,description:String(body.description||'').trim()}).eq('id',groupUpdateMatch[1]).eq('owner_id',user.id).select('*').single();
+    return {data:{item:ensure(data,error)}};
   }
   if(path.startsWith('/api/comments/')){
     const postId=path.split('/')[3];
@@ -187,10 +228,10 @@ async function post(path: string, body: any) {
     const {data:existingShare,error:shareLookupError}=await supabase.from('community_post_shares').select('post_id').eq('post_id',postId).eq('user_id',user.id).maybeSingle();
     if(shareLookupError) fail(shareLookupError.message);
     if(existingShare) return {data:{ok:true,alreadyShared:true}};
-    const {error}=await supabase.from('community_post_shares').insert({post_id:postId,user_id:user.id});
-    if(error) fail(error.message);
     const {data:repost,error:re}=await supabase.from('community_posts').insert({author_id:user.id,text:original.text,image_url:original.image_url,category:'Repost'}).select('id').single();
     if(re) fail(re.message);
+    const {error}=await supabase.from('community_post_shares').insert({post_id:postId,user_id:user.id,repost_id:repost.id});
+    if(error){await supabase.from('community_posts').delete().eq('id',repost.id).eq('author_id',user.id);fail(error.message);}
     return {data:{ok:true,item:{id:repost.id,original_post_id:postId}}};
   }
   if(path==='/api/posts'){
@@ -264,4 +305,16 @@ export const auth = {
   },
   async signOut(){const {error}=await supabase.auth.signOut();if(error)throw error;}
 };
-export const api = { get, post };
+async function del(path:string){
+  const user=await currentUser();
+  const groupPostDelete=path.match(/^\/api\/groups\/([^/]+)\/posts\/([^/]+)$/);
+  if(groupPostDelete){const {error}=await supabase.from('community_group_posts').delete().eq('id',groupPostDelete[2]).eq('group_id',groupPostDelete[1]);if(error)fail(error.message);return {data:{ok:true}};}
+  const groupMemberDelete=path.match(/^\/api\/groups\/([^/]+)\/members\/([^/]+)$/);
+  if(groupMemberDelete){const {error}=await supabase.from('group_members').delete().eq('group_id',groupMemberDelete[1]).eq('user_id',groupMemberDelete[2]);if(error)fail(error.message);return {data:{ok:true}};}
+  const postDelete=path.match(/^\/api\/posts\/([^/]+)$/);
+  if(postDelete){const {error}=await supabase.from('community_posts').delete().eq('id',postDelete[1]).eq('author_id',user.id);if(error)fail(error.message);return {data:{ok:true}};}
+  const unshare=path.match(/^\/api\/posts\/([^/]+)\/share$/);
+  if(unshare){const postId=unshare[1];const {data:share,error:se}=await supabase.from('community_post_shares').select('repost_id').eq('post_id',postId).eq('user_id',user.id).maybeSingle();if(se)fail(se.message);if(!share)return {data:{ok:true,shared:false}};if(share.repost_id){const {error}=await supabase.from('community_posts').delete().eq('id',share.repost_id).eq('author_id',user.id);if(error)fail(error.message);}const {error}=await supabase.from('community_post_shares').delete().eq('post_id',postId).eq('user_id',user.id);if(error)fail(error.message);return {data:{ok:true,shared:false}};}
+  fail('Unsupported DELETE route: '+path);
+}
+export const api = { get, post, delete: del };
