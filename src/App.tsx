@@ -748,7 +748,7 @@ export default function App() {
                       );
                   }}
                   onOpen={setSelectedListing}
-                  onContact={() => interact('contact this vendor')}
+                  onContact={contactSeller}
                 />
               ) : (
                 <div className="empty-state">
