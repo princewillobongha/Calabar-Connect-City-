@@ -1876,3 +1876,18 @@ select:focus-visible {
 .group-art { position: relative; overflow: hidden; }
 .group-art > span { position: relative; z-index: 1; }
 .group-art:has(.group-card-avatar) > span { background: rgba(255,255,255,.88); color: #315c40; }
+
+/* Clear, touch-friendly social interactions */
+.group-card { cursor: pointer; }
+.group-card:focus-visible { outline: 3px solid #80a88a; outline-offset: 3px; }
+.group-load-state,.group-load-error { margin: 12px 0; padding: 14px 16px; border-radius: 12px; background: #edf4ed; color: #315c40; }
+.group-load-error { background: #fff0ee; color: #8c3428; }
+.group-load-error .primary-btn { margin-top: 8px; }
+.mobile-bottom button { flex: 1 1 0; min-width: 0; padding-left: 2px; padding-right: 2px; }
+.post-open-text[role=button] { cursor: pointer; }
+.post-open-text[role=button]:focus-visible { outline: 2px solid #80a88a; outline-offset: 3px; border-radius: 4px; }
+.post-detail-avatar-button { display: inline-flex; flex: 0 0 42px; width: 42px; height: 42px; padding: 0; border: 0; border-radius: 50%; overflow: hidden; background: transparent; cursor: pointer; }
+.post-detail-avatar-button img { width: 100%; height: 100%; object-fit: cover; }
+.post-detail-avatar-button .avatar { width: 42px; height: 42px; }
+.liked-action svg { color: #e64c70; animation: heart-pop .22s ease-out; }
+@keyframes heart-pop { 50% { transform: scale(1.22); } }
