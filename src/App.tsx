@@ -368,9 +368,7 @@ export default function App() {
           </button>
           {user ? (
             <button className="profile-pill" onClick={async () => { try { const r=await api.get("/api/profile"); setProfile(r.data?.item || {username:user?.email?.split("@")[0]||"",display_name:user?.name||"",full_name:"",bio:"",avatar_url:""}); } catch {} setShowProfile(true); }}>
-              <span className="avatar">
-                {(user.name || user.email || 'M').slice(0, 1).toUpperCase()}
-              </span>
+              {user.avatar_url ? <img className="avatar profile-avatar-img" src={user.avatar_url} alt="Profile" /> : <span className="avatar">{(user.name || user.email || 'M').slice(0, 1).toUpperCase()}</span>}
               <span>{user.name || 'My account'}</span>
               <UserRound size={15} />
             </button>
@@ -1330,9 +1328,7 @@ function ListingGrid({
             <div className="listing-vendor">
               <span className="vendor-avatar">{item.vendor.slice(0, 1)}</span>
               <span>{item.vendor}</span>
-              <span className="verified-dot" title="Local listing">
-                ✓
-              </span>
+
             </div>
             <button className="listing-title" onClick={() => onOpen(item)}>
               {item.title}
