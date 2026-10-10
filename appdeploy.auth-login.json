@@ -1,0 +1,15 @@
+{
+  "methods": ["google", "apple", "x", "email"],
+  "headline": "Welcome to Calabar Connect City",
+  "subtitle": "Meet your people. Discover your city.",
+  "icon": "public/resources/calabar-connect-logo.png",
+  "style": {
+    "mode": "light",
+    "accentColor": "#315a40",
+    "backgroundColor": "#f0f3ed",
+    "panelColor": "#ffffff",
+    "textColor": "#263e30",
+    "fontFamily": "DM Sans, system-ui, sans-serif",
+    "borderRadius": 14
+  }
+}
