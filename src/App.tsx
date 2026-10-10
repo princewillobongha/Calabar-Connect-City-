@@ -355,16 +355,7 @@ export default function App() {
   return (
     <div className="app-shell">
       <header className="topbar">
-        <a className="brand" href="#home" onClick={() => setActive('Discover')}>
-          <img
-            src="/calabar-connect-city-logo.jpg"
-            alt="Calabar Connect City logo"
-          />
-          <span>
-            <b>CALABAR CONNECT</b>
-            <small>YOUR CITY, CONNECTED</small>
-          </span>
-        </a>
+        <a className="brand brand-logo-only" href="#home" aria-label="Calabar Connect City home" onClick={() => {setActive('Discover');setSelectedGroup(null);}}><img src="/calabar-connect-city-logo.jpg" alt="Calabar Connect City" /></a>
   
         <div className="top-actions">
           <button
@@ -711,6 +702,7 @@ export default function App() {
               </section>
             </>
           )}
+          {!memberPanel && active === 'Search' && <section className="search-page"><div className="page-title"><div><div className="eyebrow muted">FIND YOUR PEOPLE</div><h1>Search Calabar Connect City</h1><p>Search every member by username, display name or full name.</p></div></div><form className="search-page-form" onSubmit={e=>{e.preventDefault();void searchPeople();}}><Search size={20}/><input value={peopleQuery} onChange={e=>setPeopleQuery(e.target.value)} placeholder="Search people by name or @username"/><button className="primary-btn" type="submit">Search</button></form><div className="search-results-list">{people.map((person:any)=><article className="search-person-card" key={person.id}>{person.avatar_url?<img src={person.avatar_url} alt=""/>:<span className="avatar">{(person.display_name||person.username||'M').slice(0,1).toUpperCase()}</span>}<div><b>{person.display_name||person.full_name||person.username} {person.is_verified&&<BadgeCheck size={15} className="verified-badge"/>}</b><small>@{person.username||'member'}</small><p>{person.bio||person.city||'Calabar Connect City member'}</p></div><button className="primary-btn" onClick={()=>void openPublicProfile(person.id)}>View profile</button></article>)}{people.length===0&&<div className="empty-state"><Search size={28}/><h3>Find your people</h3><p>Enter a name or username above and tap Search.</p></div>}</div></section>}
           {!memberPanel && active === 'Marketplace' && (
             <>
               <div className="page-title">
