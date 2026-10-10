@@ -131,6 +131,12 @@ async function post(path: string, body: any) {
     const {data,error}=await supabase.from('listings').insert({vendor_id:vendor.id,title:body.title,description:body.description,price_ngn:numeric,image_urls:Array.isArray(body.image_urls)?body.image_urls:(body.image?[body.image]:[]),category:body.category||'Product'}).select('*, vendor:vendors(*)').single();
     return {data:{item:asItem(ensure(data,error))}};
   }
+  const reportResolveMatch=path.match(/^\/api\/admin\/reports\/([^/]+)\/resolve$/);
+  if(reportResolveMatch){
+    if((user.email||'').toLowerCase()!=='princewillobongha@gmail.com') fail('Admin access required.');
+    const {data,error}=await supabase.from('moderation_reports').update({status:'reviewed',reviewed_at:new Date().toISOString()}).eq('id',reportResolveMatch[1]).select('*').single();
+    return {data:{item:ensure(data,error)}};
+  }
   if(path==='/api/admin/verify'){
     if ((user.email||'').toLowerCase() !== 'princewillobongha@gmail.com') fail('Admin access required.');
     const {data,error}=await supabase.from('profiles').update({is_verified:!!body.verified,updated_at:new Date().toISOString()}).eq('id',body.user_id).select('id,is_verified').single();
