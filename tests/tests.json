@@ -1,0 +1,77 @@
+[
+  {
+    "name": "Explore and filter local marketplace listings",
+    "sanity": true,
+    "viewport": "desktop",
+    "covers": [
+      "public marketplace browsing",
+      "category filtering",
+      "search filtering",
+      "listing detail view"
+    ],
+    "description": "Verifies visitors can search, filter, and open a local listing without signing in.",
+    "steps": [
+      "Open Discover",
+      "Choose Explore marketplace",
+      "Search for 'sneakers'",
+      "Open the matching listing"
+    ],
+    "expected": "The matching local listing appears and its detail view shows the title, price, description and location."
+  },
+  {
+    "name": "Sign in and publish a community update",
+    "viewport": "desktop",
+    "covers": [
+      "member authentication",
+      "community post creation",
+      "backend persistence",
+      "community feed read"
+    ],
+    "description": "Verifies an authenticated member can publish a community update and see it in the feed.",
+    "steps": [
+      "Sign in using the secure sign-in dialog",
+      "Open Community",
+      "Choose Write a post",
+      "Publish a short community update",
+      "Refresh the page"
+    ],
+    "expected": "The new update is visible in the community feed after refresh."
+  },
+  {
+    "name": "Publish a marketplace listing with validation",
+    "viewport": "mobile",
+    "covers": [
+      "authenticated listing creation",
+      "required field validation",
+      "marketplace listing persistence",
+      "mobile responsive listing form"
+    ],
+    "description": "Verifies empty listing details are rejected and valid listing data is published.",
+    "steps": [
+      "Sign in",
+      "Open Marketplace",
+      "Choose Create listing",
+      "Submit the form with title and description empty",
+      "Fill in title and description and publish"
+    ],
+    "expected": "The empty submission is blocked, and the valid listing appears in the marketplace."
+  },
+  {
+    "name": "Explore seeded groups and protect member actions",
+    "viewport": "desktop",
+    "covers": [
+      "community group discovery",
+      "seeded group availability",
+      "authentication gate for restricted actions",
+      "visible feedback"
+    ],
+    "description": "Verifies community groups are available to browse and member-only actions ask visitors to sign in.",
+    "steps": [
+      "Open Groups",
+      "Confirm the Calabar Food Lovers group is visible",
+      "Sign out if signed in",
+      "Choose a member-only action such as Join group"
+    ],
+    "expected": "The groups are visible publicly, and the user is asked to sign in before a restricted action."
+  }
+]
