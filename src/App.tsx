@@ -229,7 +229,7 @@ export default function App() {
   const signIn = async () => {
     try {
       const result = await auth.signIn(authEmail, authPassword, authMode);
-      setUser(result.user);
+      if (!(result as any).confirmationRequired) setUser(result.user);
       setShowAuth(false);
       setAuthPassword('');
       setNotice((result as any).confirmationRequired ? 'Account created. Check your email to confirm, then sign in.' : 'You are signed in. Welcome to the community!');
@@ -376,7 +376,7 @@ export default function App() {
       <header className="topbar">
         <a className="brand" href="#home" onClick={() => setActive('Discover')}>
           <img
-            src="/resources/calabar-connect-logo.png"
+            src="/calabar-connect-city-logo.jpg"
             alt="Calabar Connect City logo"
           />
           <span>
