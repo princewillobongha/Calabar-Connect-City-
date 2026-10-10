@@ -352,7 +352,7 @@ export default function App() {
   return (
     <div className="app-shell">
       <header className="topbar">
-        <a className="brand brand-logo-only" href="#home" aria-label="Calabar Connect City home" onClick={() => {setActive('Discover');setSelectedGroup(null);}}><img src="/calabar-connect-city-logo.jpg" alt="Calabar Connect City" /></a>
+        <a className="brand brand-logo-only" href="#home" aria-label="Calabar Connect City home" onClick={() => {setActive('Discover');setSelectedGroup(null);}}><img src="/calabar-connect-city-logo.svg" alt="Calabar Connect City" /></a>
   
         <div className="top-actions">
           <button
