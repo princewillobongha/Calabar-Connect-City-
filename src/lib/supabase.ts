@@ -20,16 +20,21 @@ const slugify = (s: string) => s.toLowerCase().normalize('NFKD').replace(/[^a-z0
 const normalizeWhatsApp = (input: string): string => {
   const raw=String(input||'').trim(); if(!raw) return '';
   let digits='';
-  if(/^https?:\\/\\//i.test(raw)||/^(wa\\.me\\/|api\\.whatsapp\\.com\\/)/i.test(raw)) {
-    try { const u=new URL(/^https?:\\/\\//i.test(raw)?raw:'https://'+raw); const fromPath=u.pathname.replace(/\\D/g,''); const fromQuery=(u.searchParams.get('phone')||'').replace(/\\D/g,''); digits=fromQuery||fromPath; if(!['wa.me','www.wa.me','api.whatsapp.com','www.api.whatsapp.com'].includes(u.hostname.toLowerCase())) return ''; } catch { return ''; }
-  } else if(/^\\+?[0-9\\s().-]+$/.test(raw)) digits=raw.replace(/\\D/g,'');
+  if(/^https?:\/\//i.test(raw)||/^(wa\.me\/|api\.whatsapp\.com\/)/i.test(raw)) {
+    try {
+      const u=new URL(/^https?:\/\//i.test(raw)?raw:'https://'+raw);
+      const fromPath=u.pathname.replace(/\D/g,'');
+      const fromQuery=(u.searchParams.get('phone')||'').replace(/\D/g,'');
+      digits=fromQuery||fromPath;
+      if(!['wa.me','www.wa.me','api.whatsapp.com','www.api.whatsapp.com'].includes(u.hostname.toLowerCase())) return '';
+    } catch { return ''; }
+  } else if(/^\+?[0-9\s().-]+$/.test(raw)) digits=raw.replace(/\D/g,'');
   else return '';
   if(digits.length===11&&digits.startsWith('0')) digits='234'+digits.slice(1);
   else if(digits.length===10) digits='234'+digits;
   if(digits.length<10||digits.length>15) return '';
   return 'https://wa.me/'+digits;
 };
-const asItem = (x: any) => ({...x, id:x.id, vendor_id:x.vendor_id, vendor_owner_id:x.vendor?.owner_id, title:x.title, category:x.category, price: x.price_ngn ? '₦'+Number(x.price_ngn).toLocaleString('en-NG') : 'Ask for price', location:x.vendor?.address || x.vendor?.area || 'Calabar, Cross River', description:x.description || '', images:Array.isArray(x.image_urls)?x.image_urls:[], image:x.image_urls?.[0] || '', vendor:x.vendor?.business_name || 'Calabar vendor', kind:x.category || 'Product'});
 export async function uploadImage(file: File) {
   const user = await currentUser();
   if (!file.type.startsWith('image/')) fail('Choose an image file.');
