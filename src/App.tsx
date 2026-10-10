@@ -116,6 +116,7 @@ export default function App() {
   const [authEmail, setAuthEmail] = useState('');
   const [authPassword, setAuthPassword] = useState('');
   const [authMode, setAuthMode] = useState<'signin'|'signup'>('signin');
+  const [confirmationEmail, setConfirmationEmail] = useState('');
   const [listingImage, setListingImage] = useState<File[]>([]);
   const [postImage, setPostImage] = useState<File|null>(null);
   const [showProfile, setShowProfile] = useState(false);
@@ -204,6 +205,7 @@ export default function App() {
       if (!(result as any).confirmationRequired) setUser(result.user);
       setShowAuth(false);
       setAuthPassword('');
+      if((result as any).confirmationRequired)setConfirmationEmail(authEmail.trim());else setConfirmationEmail('');
       setNotice((result as any).confirmationRequired ? 'Account created. Check your email to confirm, then sign in.' : 'You are signed in. Welcome to the community!');
     } catch (e: any) {
       const message = typeof e?.message === 'string' ? e.message : '';
@@ -548,6 +550,7 @@ export default function App() {
           {!memberPanel && notice && (
             <div className="notice" role="status">
               <span>{notice}</span>
+              {confirmationEmail&&<button className="text-link" onClick={async()=>{try{await auth.resendConfirmation(confirmationEmail);setNotice('A new confirmation email has been sent to '+confirmationEmail+'. Check your inbox and spam folder.');setConfirmationEmail('');}catch(e:any){setNotice(e?.message||'Could not resend the confirmation email. Check Supabase Auth redirect URLs and email settings.');}}}>Resend confirmation email</button>}
               <button
                 aria-label="Dismiss message"
                 onClick={() => setNotice('')}
