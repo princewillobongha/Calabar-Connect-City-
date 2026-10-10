@@ -39,7 +39,7 @@ async function get(path: string) {
     const ownerId=(listing as any).vendor?.owner_id;
     const {data:profile,error:profileError}=ownerId?await supabase.from('profiles').select('whatsapp_url').eq('id',ownerId).maybeSingle():{data:null,error:null};
     if(profileError) fail(profileError.message);
-    let raw=String((listing as any).vendor?.whatsapp_url||profile?.whatsapp_url||'').trim();
+    let raw=String(profile?.whatsapp_url||(listing as any).vendor?.whatsapp_url||'').trim();
     let url='';
     if(raw){
       const digits=raw.replace(/\D/g,'');
