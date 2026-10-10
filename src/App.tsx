@@ -857,7 +857,7 @@ export default function App() {
                         </small>
                         <p>{p.text}</p>
                         {p.image_url && <img className="post-photo" src={p.image_url} alt="Community post" />}
-                        <div className="post-actions"><button className="text-link" onClick={()=>void api.post('/api/posts/'+p.id+'/like',{}).then(()=>setNotice('Like updated.')).catch(()=>setNotice('Could not like post.'))}><Heart size={15}/> Like</button><button className="text-link" onClick={()=>openComments===p.id?setOpenComments(null):void loadComments(p.id)}><MessageCircle size={15}/> Reply</button><button className="text-link" onClick={()=>void api.post('/api/posts/'+p.id+'/share',{}).then(()=>setNotice('Post reshared.')).catch(()=>setNotice('Could not reshare post.'))}><ArrowUpRight size={15}/> Reshare</button></div>
+                        <div className="post-actions"><button className="text-link" onClick={()=>void api.post('/api/posts/'+p.id+'/like',{}).then(()=>setNotice('Like updated.')).catch(()=>setNotice('Could not like post.'))}><Heart size={15}/> Like</button><button className="text-link" onClick={()=>openComments===p.id?setOpenComments(null):void loadComments(p.id)}><MessageCircle size={15}/> Reply</button><button className="text-link" onClick={()=>void api.post('/api/posts/'+p.id+'/share',{}).then(async()=>{const r=await api.get('/api/posts');setPosts(r.data?.items||[]);setNotice('Post reshared.');}).catch(()=>setNotice('Could not reshare post.'))}><ArrowUpRight size={15}/> Reshare</button></div>
                         {openComments===p.id && <div className="comment-thread">{(comments[p.id]||[]).map((cm:any)=><p key={cm.id}><b>{cm.author_profile?.display_name||cm.author_profile?.username||'Member'}:</b> {cm.text}</p>)}<form onSubmit={e=>{e.preventDefault();void addComment(p.id);}}><input value={commentText[p.id]||''} onChange={e=>setCommentText(v=>({...v,[p.id]:e.target.value}))} placeholder="Write a reply..." required/><button type="submit" className="primary-btn">Reply</button></form></div>}
                       </div>
                     </article>
@@ -1151,7 +1151,7 @@ export default function App() {
               </label>
               <label>
                 Product photo
-                <input type="file" accept="image/*" onChange={e=>setListingImage(Array.from(e.target.files||[]))} />
+                <input type="file" accept="image/*" multiple onChange={e=>setListingImage(Array.from(e.target.files||[]))} />
               </label>
               <label>
                 Description
