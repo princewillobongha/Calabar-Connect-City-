@@ -87,7 +87,7 @@ async function get(path: string) {
   if (publicProfileMatch) {
     const user=await currentUser();
     const targetId=publicProfileMatch[1];
-    const {data,error}=await supabase.from('profiles').select('id,username,display_name,full_name,avatar_url,bio,city,is_verified,created_at,whatsapp_url').eq('id',targetId).single();
+    const {data,error}=await supabase.from('profiles').select('id,username,display_name,full_name,avatar_url,bio,city,is_verified,created_at').eq('id',targetId).single();
     if(error) fail(error.message);
     const {data:posts,error:postError}=await supabase.from('community_posts').select('id,text,image_url,created_at,author_id,category').eq('author_id',targetId).order('created_at',{ascending:false}).limit(50);
     if(postError) fail(postError.message);
