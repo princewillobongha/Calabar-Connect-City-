@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { auth, api } from '@appdeploy/client';
+import { auth, api } from './lib/supabase';
 import {
   Search,
   MapPin,
@@ -176,6 +176,9 @@ export default function App() {
   const [memberItems, setMemberItems] = useState<any[]>([]);
   const [recipientId, setRecipientId] = useState('');
   const [memberText, setMemberText] = useState('');
+  const [authEmail, setAuthEmail] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
+  const [authMode, setAuthMode] = useState<'signin'|'signup'>('signin');
   useEffect(() => {
     let live = true;
     Promise.all([
@@ -225,10 +228,11 @@ export default function App() {
   );
   const signIn = async () => {
     try {
-      const result = await auth.signIn();
+      const result = await auth.signIn(authEmail, authPassword, authMode);
       setUser(result.user);
       setShowAuth(false);
-      setNotice('You are signed in. Welcome to the community!');
+      setAuthPassword('');
+      setNotice((result as any).confirmationRequired ? 'Account created. Check your email to confirm, then sign in.' : 'You are signed in. Welcome to the community!');
     } catch (e: any) {
       setNotice(
         e?.code === 'popup_blocked'
@@ -1118,7 +1122,7 @@ export default function App() {
             </button>
             <img
               className="modal-logo"
-              src="/resources/calabar-connect-logo.png"
+              src="/calabar-connect-city-logo.png"
               alt="Calabar Connect City"
             />
             <span className="eyebrow muted">WELCOME TO YOUR CITY</span>
@@ -1127,13 +1131,13 @@ export default function App() {
               Sign in to save favourites, publish listings, join groups and
               connect with the community.
             </p>
-            <button className="primary-btn full-btn" onClick={signIn}>
-              <LogIn size={17} /> Continue securely
-            </button>
-            <small className="fine-print">
-              Secure sign-in opens in a pop-up window. If it doesn't appear,
-              allow pop-ups and try again.
-            </small>
+            <form className="auth-form" onSubmit={e => { e.preventDefault(); void signIn(); }}>
+              <label>Email address<input type="email" autoComplete="email" required value={authEmail} onChange={e=>setAuthEmail(e.target.value)} placeholder="you@example.com" /></label>
+              <label>Password<input type="password" autoComplete={authMode==='signup'?'new-password':'current-password'} minLength={6} required value={authPassword} onChange={e=>setAuthPassword(e.target.value)} placeholder="At least 6 characters" /></label>
+              <button className="primary-btn full-btn" type="submit"><LogIn size={17} /> {authMode==='signup'?'Create account':'Sign in securely'}</button>
+            </form>
+            <small className="fine-print">{authMode==='signup'?'Create your free Calabar Connect City account.':'Sign in to save favourites, publish listings and connect.'}</small>
+            <button className="text-link auth-switch" onClick={()=>setAuthMode(m=>m==='signin'?'signup':'signin')}>{authMode==='signup'?'Already have an account? Sign in':'New here? Create an account'}</button>
           </div>
         </div>
       )}
