@@ -17,15 +17,10 @@ import {
   ChevronRight,
   X,
   LogIn,
-  LogOut,
-  ImagePlus,
   Sparkles,
   ShieldCheck,
   ArrowUpRight,
-  Bookmark,
   ShoppingCart,
-  Repeat2,
-  ThumbsUp,
   UserRound,
   BadgeCheck,
 } from 'lucide-react';
@@ -58,8 +53,6 @@ type Post = {
   author_id?: string;
   is_verified?: boolean;
 };
-const starterListings: Listing[] = [];
-const starterGroups: Group[] = [];
 const categories = [
   { name: 'All', icon: ShoppingBag, color: 'sand' },
   { name: 'Food', icon: Utensils, color: 'peach' },
@@ -72,7 +65,7 @@ function money(value: string) {
 }
 export default function App() {
   const [user, setUser] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const [, setLoading] = useState(true);
   const [listings, setListings] = useState<Listing[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
