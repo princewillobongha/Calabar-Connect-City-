@@ -34,6 +34,7 @@ type Listing = {
   location: string;
   description: string;
   image: string;
+  images?: string[];
   vendor: string;
   kind: string;
 };
@@ -53,6 +54,7 @@ type Post = {
   image_url?: string | null;
   author_id?: string;
   is_verified?: boolean;
+  avatar_url?: string | null;
 };
 const categories = [
   { name: 'All', icon: ShoppingBag, color: 'sand' },
@@ -87,6 +89,7 @@ export default function App() {
     location: 'Calabar, Cross River',
     description: '',
     image: '',
+    whatsapp_url: '',
   });
   const [postText, setPostText] = useState('');
   const [busy, setBusy] = useState(false);
@@ -107,6 +110,8 @@ export default function App() {
   const [peopleQuery, setPeopleQuery] = useState('');
   const [people, setPeople] = useState<any[]>([]);
   const [showAdmin, setShowAdmin] = useState(false);
+  const [publicProfile, setPublicProfile] = useState<any>(null);
+  const [isFollowingProfile, setIsFollowingProfile] = useState(false);
   const [adminProfiles, setAdminProfiles] = useState<any[]>([]);
   const [groupName, setGroupName] = useState('');
   const [groupDescription, setGroupDescription] = useState('');
@@ -196,9 +201,12 @@ export default function App() {
   const searchPeople = async () => { try { const r=await api.get('/api/people?q='+encodeURIComponent(peopleQuery)); setPeople(r.data?.items||[]); } catch { setNotice('Could not search members.'); } };
   const openAdmin = async () => { if((user?.email||'').toLowerCase()!=='princewillobongha@gmail.com'){setNotice('Admin access required.');return;} try {const r=await api.get('/api/admin/profiles');setAdminProfiles(r.data?.items||[]);setShowAdmin(true);} catch(e:any){setNotice(e?.message||'Could not load admin tools.');} };
   const saveProfile = async () => { try { const r=await api.post('/api/profile',profile); setProfile(r.data.item); setUser((u:any)=>({...u,name:r.data.item.display_name,username:r.data.item.username,avatar_url:r.data.item.avatar_url})); setShowProfile(false); setNotice('Profile saved.'); } catch(e:any) { setNotice(e?.message||'Could not save profile.'); } };
+  const openPublicProfile = async (id:string) => { try { const r=await api.get('/api/profile/'+id); setPublicProfile(r.data?.item||null); setIsFollowingProfile(!!r.data?.is_following); } catch(e:any) { setNotice(e?.message||'Could not load this profile.'); } };
+  const toggleFollow = async (id:string) => { if(!requireMember('follow members'))return; try { const r=await api.post('/api/follows/toggle',{followed_id:id}); setIsFollowingProfile(!!r.data?.following); setNotice(r.data?.following?'You are now following this member.':'You unfollowed this member.'); } catch(e:any) { setNotice(e?.message||'Could not update follow status.'); } };
+  const contactSeller = async (listing:Listing) => { try { const r=await api.get('/api/listings/'+listing.id+'/contact'); const url=String(r.data?.url||''); if(!url) { setNotice('This seller has not added a WhatsApp contact yet.'); return; } window.open(url,'_blank','noopener,noreferrer'); } catch(e:any) { setNotice(e?.message||'Could not open seller contact.'); } };
   const loadComments = async (id:string) => { setOpenComments(id); try { const r=await api.get('/api/comments/'+id); setComments(p=>({...p,[id]:r.data?.items||[]})); } catch { setNotice('Could not load replies.'); } };
   const addComment = async (id:string) => { if(!requireMember('Sign in to reply.'))return; const text=(commentText[id]||'').trim(); if(!text)return; try { await api.post('/api/comments/'+id,{text}); setCommentText(p=>({...p,[id]:''})); await loadComments(id); } catch(e:any) { setNotice(e?.message||'Could not post reply.'); } };
-  const createGroup = async () => { if(!requireMember('Sign in to create a group.'))return; try { const r=await api.post('/api/groups',{name:groupName,description:groupDescription}); setGroups(p=>[r.data.item,...p]); setShowGroupForm(false); setGroupName(''); setGroupDescription(''); setNotice('Group created.'); } catch(e:any) { setNotice(e?.message||'Could not create group.'); } };
+  const createGroup = async () => { if(!requireMember('Sign in to create a group.'))return; if(groupName.trim().length<3){setNotice('Group name must be at least 3 characters.');return;} setBusy(true); try { const r=await api.post('/api/groups',{name:groupName,description:groupDescription}); setGroups(p=>[r.data.item,...p]); setShowGroupForm(false); setGroupName(''); setGroupDescription(''); setNotice('Group created successfully.'); } catch(e:any) { setNotice(e?.message||'Could not create group.'); } finally {setBusy(false);} };
   const saveListing = async () => {
     if (!requireMember('Sign in to publish a listing.')) return;
     if (!form.title.trim() || !form.description.trim()) {
@@ -212,6 +220,7 @@ export default function App() {
         ...form,
         image: imageUrls[0] || '',
         image_urls: imageUrls,
+        whatsapp_url: form.whatsapp_url.trim(),
         vendor: user.name || user.email || 'Community member',
         kind: form.category,
         created_at: new Date().toISOString(),
@@ -237,10 +246,11 @@ export default function App() {
         location: 'Calabar, Cross River',
         description: '',
         image: '',
+        whatsapp_url: '',
       });
       setNotice('Your listing is published.');
-    } catch {
-      setNotice('We could not publish this listing. Please try again.');
+    } catch (e:any) {
+      setNotice(e?.message || 'We could not publish this listing. Please try again.');
     } finally {
       setBusy(false);
     }
@@ -295,10 +305,6 @@ export default function App() {
       void api.post('/api/groups/' + group.id + '/join', {})
         .then(() => setNotice('You joined ' + name + '.'))
         .catch(() => setNotice('Could not join this group. Please try again.'));
-      return;
-    }
-    if (label.includes('create a group')) {
-      setNotice('Group creation is being prepared. Try again shortly.');
       return;
     }
     setNotice('You are signed in. Please use the Messages or Connections tools to contact members safely.');
@@ -672,7 +678,7 @@ export default function App() {
                       );
                   }}
                   onOpen={setSelectedListing}
-                  onContact={() => interact('contact this vendor')}
+                  onContact={contactSeller}
                 />
               </section>
               <section className="community-banner">
@@ -780,7 +786,7 @@ export default function App() {
                   <Plus size={17} /> Create a group
                 </button>
               </div>
-              {groups.length===0 ? <div className="empty-state"><Users size={28}/><h3>No groups yet</h3><p>Create the first community group.</p><button className="primary-btn" onClick={()=>setShowGroupForm(true)}>Create a group</button></div> : <div className="group-grid">
+              {groups.length===0 ? <div className="empty-state"><Users size={28}/><h3>No groups yet</h3><p>Create the first community group.</p><button className="primary-btn" onClick={()=>{if(requireMember('Sign in to create a group.'))setShowGroupForm(true);}}>Create a group</button></div> : <div className="group-grid">
                 {groups.map((g, i) => (
                   <article className="group-card" key={g.id}>
                     <div className={'group-art art-' + i}>
@@ -850,9 +856,9 @@ export default function App() {
                 {posts.length ? (
                   posts.map(p => (
                     <article className="feed-card" key={p.id}>
-                      <div className="feed-avatar">{p.avatar_url ? <img src={p.avatar_url} alt="" /> : (p.author || 'C').slice(0, 1).toUpperCase()}</div>
+                      <button className="feed-avatar feed-avatar-button" aria-label={'View '+(p.author||'member')+' profile'} onClick={()=>p.author_id&&void openPublicProfile(p.author_id)}>{p.avatar_url ? <img src={p.avatar_url} alt="" /> : (p.author || 'C').slice(0, 1).toUpperCase()}</button>
                       <div>
-                        <b>{p.author || 'Community member'} {p.is_verified && <BadgeCheck size={16} className="verified-badge" aria-label="Verified account"/>}</b>
+                        <button className="post-author-link" onClick={()=>p.author_id&&void openPublicProfile(p.author_id)}>{p.author || 'Community member'} {p.is_verified && <BadgeCheck size={16} className="verified-badge" aria-label="Verified account"/>}</button>
                         <small>
                           {p.category || 'Community'} ·{' '}
                           {p.created_at
@@ -861,8 +867,8 @@ export default function App() {
                         </small>
                         <p>{p.text}</p>
                         {p.image_url && <img className="post-photo" src={p.image_url} alt="Community post" />}
-                        <div className="post-actions"><button className="text-link" onClick={()=>void api.post('/api/posts/'+p.id+'/like',{}).then(()=>setNotice('Like updated.')).catch(()=>setNotice('Could not like post.'))}><Heart size={15}/> Like</button><button className="text-link" onClick={()=>openComments===p.id?setOpenComments(null):void loadComments(p.id)}><MessageCircle size={15}/> Reply</button><button className="text-link" onClick={()=>setSaved(v=>v.includes("post:"+p.id)?v.filter(x=>x!=="post:"+p.id):[...v,"post:"+p.id])}><Bookmark size={15}/> Bookmark</button><button className="text-link" onClick={()=>void api.post('/api/posts/'+p.id+'/share',{}).then(async()=>{const r=await api.get('/api/posts');setPosts(r.data?.items||[]);setNotice('Post reshared.');}).catch(()=>setNotice('Could not reshare post.'))}><ArrowUpRight size={15}/> Reshare</button></div>
-                        {openComments===p.id && <div className="comment-thread">{(comments[p.id]||[]).map((cm:any)=><p key={cm.id}><b>{cm.author_profile?.display_name||cm.author_profile?.username||'Member'}:</b> {cm.text}</p>)}<form onSubmit={e=>{e.preventDefault();void addComment(p.id);}}><input value={commentText[p.id]||''} onChange={e=>setCommentText(v=>({...v,[p.id]:e.target.value}))} placeholder="Write a reply..." required/><button type="submit" className="primary-btn">Reply</button></form></div>}
+                        <div className="post-actions"><button className="text-link" onClick={()=>{if(!requireMember('like posts'))return;void api.post('/api/posts/'+p.id+'/like',{}).then(r=>setNotice(r.data?.liked?'You liked this post.':'Like removed.')).catch(()=>setNotice('Could not like post.'));}}><Heart size={15}/> Like</button><button className="text-link" onClick={()=>openComments===p.id?setOpenComments(null):void loadComments(p.id)}><MessageCircle size={15}/> Reply</button><button className="text-link" onClick={()=>setSaved(v=>v.includes("post:"+p.id)?v.filter(x=>x!=="post:"+p.id):[...v,"post:"+p.id])}><Bookmark size={15}/> Bookmark</button><button className="text-link" onClick={()=>void api.post('/api/posts/'+p.id+'/share',{}).then(async()=>{const r=await api.get('/api/posts');setPosts(r.data?.items||[]);setNotice('Post reshared.');}).catch(()=>setNotice('Could not reshare post.'))}><ArrowUpRight size={15}/> Reshare</button></div>
+                        {openComments===p.id && <div className="comment-thread">{(comments[p.id]||[]).map((cm:any)=><p key={cm.id}><button className="post-author-link" onClick={()=>cm.author_id&&void openPublicProfile(cm.author_id)}>{cm.author_profile?.display_name||cm.author_profile?.username||'Member'}</button>: {cm.text}</p>)}<form onSubmit={e=>{e.preventDefault();void addComment(p.id);}}><input value={commentText[p.id]||''} onChange={e=>setCommentText(v=>({...v,[p.id]:e.target.value}))} placeholder="Write a reply..." required/><button type="submit" className="primary-btn">Reply</button></form></div>}
                       </div>
                     </article>
                   ))
@@ -936,7 +942,7 @@ export default function App() {
                     );
                 }}
                 onOpen={setSelectedListing}
-                onContact={() => interact('contact this poster')}
+                onContact={contactSeller}
               />
             </>
           )}
@@ -1085,11 +1091,12 @@ export default function App() {
           </div>
         </div>
       )}
-      {showPeople && <div className="modal-backdrop" onClick={()=>setShowPeople(false)}><div className="modal form-modal" onClick={e=>e.stopPropagation()}><button className="modal-close" onClick={()=>setShowPeople(false)}><X size={18}/></button><h2>Find people</h2><form onSubmit={e=>{e.preventDefault();void searchPeople();}}><label>Search by username<input value={peopleQuery} onChange={e=>setPeopleQuery(e.target.value)} placeholder="Enter a username" required/></label><button className="primary-btn full-btn" type="submit">Search members</button></form><div className="member-list">{people.map((person:any)=><article className="member-item" key={person.id}>{person.avatar_url&&<img className="profile-preview" src={person.avatar_url} alt=""/>}<b>{person.display_name||person.username} {person.is_verified&&<BadgeCheck size={16} className="verified-badge"/>}</b><p>@{person.username}</p><button className="primary-btn" onClick={()=>{setRecipientId(person.id);setShowPeople(false);void openMemberPanel('messages');setNotice('Member selected. You can message them from the Messages panel.');}}>Message</button></article>)}</div></div></div>}
+      {showPeople && <div className="modal-backdrop" onClick={()=>setShowPeople(false)}><div className="modal form-modal" onClick={e=>e.stopPropagation()}><button className="modal-close" onClick={()=>setShowPeople(false)}><X size={18}/></button><h2>Find people</h2><form onSubmit={e=>{e.preventDefault();void searchPeople();}}><label>Search by username<input value={peopleQuery} onChange={e=>setPeopleQuery(e.target.value)} placeholder="Enter a username" required/></label><button className="primary-btn full-btn" type="submit">Search members</button></form><div className="member-list">{people.map((person:any)=><article className="member-item" key={person.id}>{person.avatar_url&&<img className="profile-preview" src={person.avatar_url} alt=""/>}<b>{person.display_name||person.username} {person.is_verified&&<BadgeCheck size={16} className="verified-badge"/>}</b><p>@{person.username}</p><button className="primary-btn" onClick={()=>{setShowPeople(false);void openPublicProfile(person.id);}}>View profile</button></article>)}</div></div></div>}
       {showAdmin && <div className="modal-backdrop" onClick={()=>setShowAdmin(false)}><div className="modal form-modal" onClick={e=>e.stopPropagation()}><button className="modal-close" onClick={()=>setShowAdmin(false)}><X size={18}/></button><h2>Member verification</h2><p>Only the designated admin can grant or remove the blue verified badge.</p>{adminProfiles.map((person:any)=><article className="member-item" key={person.id}><b>{person.display_name||person.username||'Member'} {person.is_verified&&<BadgeCheck size={16} className="verified-badge"/>}</b><p>@{person.username||'no username'}</p><button className="primary-btn" onClick={async()=>{try{await api.post('/api/admin/verify',{user_id:person.id,verified:!person.is_verified});setAdminProfiles(p=>p.map(x=>x.id===person.id?{...x,is_verified:!person.is_verified}:x));setNotice('Verification status updated.');}catch(e:any){setNotice(e?.message||'Could not update verification.');}}}>{person.is_verified?'Remove blue badge':'Verify member'}</button></article>)}</div></div>}
       {showCart && <div className="modal-backdrop" onClick={()=>setShowCart(false)}><div className="modal form-modal" onClick={e=>e.stopPropagation()}><button className="modal-close" onClick={()=>setShowCart(false)}><X size={18}/></button><h2>Your cart</h2>{cart.length===0?<div className="empty-state"><ShoppingCart size={26}/><h3>Your cart is empty</h3><p>Open a marketplace item and add it to your cart.</p></div>:<>{cart.map((item,i)=><div className="cart-row" key={item.id+'-'+i}>{item.image&&<img src={item.image} alt={item.title}/>}<div><b>{item.title}</b><p>{item.price}</p></div><button className="text-link" onClick={()=>setCart(v=>v.filter((_,idx)=>idx!==i))}>Remove</button></div>)}<button className="primary-btn full-btn" onClick={()=>{setShowCart(false);setNotice('Cart items are saved on this device. Contact the seller from each listing to arrange your order.');}}>Continue</button></>}</div></div>}
-      {showProfile && <div className="modal-backdrop" onClick={()=>setShowProfile(false)}><div className="modal form-modal" onClick={e=>e.stopPropagation()}><button className="modal-close" onClick={()=>setShowProfile(false)}><X size={18}/></button><h2>Edit profile</h2>{profile.avatar_url&&<img src={profile.avatar_url} className="profile-preview" alt="Profile"/>}<label>Profile picture<input type="file" accept="image/*" onChange={async e=>{const f=e.target.files?.[0];if(f)try{setProfile((p:any)=>({...p,avatar_url:await uploadImage(f)}));}catch(err:any){setNotice(err?.message||'Image upload failed.');}}}/></label><label>Username<input value={profile.username||''} onChange={e=>setProfile((p:any)=>({...p,username:e.target.value}))} required/></label><label>Display name<input value={profile.display_name||''} onChange={e=>setProfile((p:any)=>({...p,display_name:e.target.value}))} required/></label><label>Full name<input value={profile.full_name||''} onChange={e=>setProfile((p:any)=>({...p,full_name:e.target.value}))}/></label><label>Bio<textarea value={profile.bio||''} onChange={e=>setProfile((p:any)=>({...p,bio:e.target.value}))}/></label><button className="primary-btn full-btn" onClick={()=>void saveProfile()}>Save profile</button></div></div>}
-      {showGroupForm && <div className="modal-backdrop" onClick={()=>setShowGroupForm(false)}><div className="modal form-modal" onClick={e=>e.stopPropagation()}><button className="modal-close" onClick={()=>setShowGroupForm(false)}><X size={18}/></button><h2>Create a group</h2><label>Group name<input value={groupName} onChange={e=>setGroupName(e.target.value)} required/></label><label>Description<textarea value={groupDescription} onChange={e=>setGroupDescription(e.target.value)}/></label><button className="primary-btn full-btn" onClick={()=>void createGroup()}>Create group</button></div></div>}
+      {showProfile && <div className="modal-backdrop" onClick={()=>setShowProfile(false)}><div className="modal form-modal" onClick={e=>e.stopPropagation()}><button className="modal-close" onClick={()=>setShowProfile(false)}><X size={18}/></button><h2>Edit profile</h2>{profile.avatar_url&&<img src={profile.avatar_url} className="profile-preview" alt="Profile"/>}<label>Profile picture<input type="file" accept="image/*" onChange={async e=>{const f=e.target.files?.[0];if(f)try{const avatarUrl=await uploadImage(f);setProfile((p:any)=>({...p,avatar_url:avatarUrl}));}catch(err:any){setNotice(err?.message||'Image upload failed.');}}}/></label><label>Username<input value={profile.username||''} onChange={e=>setProfile((p:any)=>({...p,username:e.target.value}))} required/></label><label>Display name<input value={profile.display_name||''} onChange={e=>setProfile((p:any)=>({...p,display_name:e.target.value}))} required/></label><label>Full name<input value={profile.full_name||''} onChange={e=>setProfile((p:any)=>({...p,full_name:e.target.value}))}/></label><label>Bio<textarea value={profile.bio||''} onChange={e=>setProfile((p:any)=>({...p,bio:e.target.value}))}/></label><button className="primary-btn full-btn" onClick={()=>void saveProfile()}>Save profile</button></div></div>}
+      {publicProfile && <div className="modal-backdrop" onClick={()=>setPublicProfile(null)}><div className="modal form-modal" onClick={e=>e.stopPropagation()}><button className="modal-close" onClick={()=>setPublicProfile(null)}><X size={18}/></button>{publicProfile.avatar_url&&<img src={publicProfile.avatar_url} className="profile-preview" alt="Profile"/>}<h2>{publicProfile.display_name||publicProfile.username||'Calabar member'} {publicProfile.is_verified&&<BadgeCheck size={20} className="verified-badge"/>}</h2><p>@{publicProfile.username||'member'}</p>{publicProfile.full_name&&<p>{publicProfile.full_name}</p>}<p>{publicProfile.bio||'No bio added yet.'}</p><button className="primary-btn full-btn" onClick={()=>void toggleFollow(publicProfile.id)}>{isFollowingProfile?'Following · Unfollow':'Follow member'}</button><h3>Community posts</h3>{(publicProfile.posts||[]).map((post:any)=><article className="member-item" key={post.id}><p>{post.text}</p>{post.image_url&&<img className="post-photo" src={post.image_url} alt="Post"/>}<small>{post.created_at?new Date(post.created_at).toLocaleDateString():'Recently'}</small></article>)}{!(publicProfile.posts||[]).length&&<p>No public posts yet.</p>}</div></div>}
+      {showGroupForm && <div className="modal-backdrop" onClick={()=>setShowGroupForm(false)}><div className="modal form-modal" onClick={e=>e.stopPropagation()}><button className="modal-close" onClick={()=>setShowGroupForm(false)}><X size={18}/></button><h2>Create a group</h2><label>Group name<input value={groupName} onChange={e=>setGroupName(e.target.value)} required/></label><label>Description<textarea value={groupDescription} onChange={e=>setGroupDescription(e.target.value)}/></label><button className="primary-btn full-btn" disabled={busy} onClick={()=>void createGroup()}>{busy?'Creating…':'Create group'}</button></div></div>}
       {showListingForm && (
         <div
           className="modal-backdrop"
@@ -1154,8 +1161,14 @@ export default function App() {
                 />
               </label>
               <label>
-                Product photo
+                Seller WhatsApp link or international phone number
+                <input type="text" value={form.whatsapp_url} onChange={e=>setForm({...form,whatsapp_url:e.target.value})} placeholder="https://wa.me/234... or 234..." />
+                <small className="fine-print">Used when a buyer taps Contact seller; it is not printed on the listing.</small>
+              </label>
+              <label>
+                Product photos (select multiple)
                 <input type="file" accept="image/*" multiple onChange={e=>setListingImage(Array.from(e.target.files||[]))} />
+                {listingImage.length>0&&<small>{listingImage.length} photo(s) selected</small>}
               </label>
               <label>
                 Description
@@ -1229,14 +1242,7 @@ export default function App() {
             >
               <X size={18} />
             </button>
-            <img
-              className="detail-image"
-              src={
-                selectedListing.image ||
-                'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=900&q=80'
-              }
-              alt={selectedListing.title}
-            />
+            {selectedListing.image ? <img className="detail-image" src={selectedListing.image} alt={selectedListing.title}/> : <div className="detail-image listing-no-image">No product photo uploaded</div>}
             <span className="eyebrow muted">
               {selectedListing.category} · LOCAL LISTING
             </span>
@@ -1251,10 +1257,11 @@ export default function App() {
               <Store size={16} />
               {selectedListing.vendor || 'Local vendor'}
             </div>
+            {(selectedListing.images||[]).slice(1).map((imageUrl,i)=><img key={imageUrl+i} className="detail-gallery-image" src={imageUrl} alt={selectedListing.title+' photo '+(i+2)}/>)}
             <button className="ghost-btn full-btn" onClick={() => { if(requireMember('add items to your cart')) { setCart(v=>[...v,selectedListing]); setNotice('Added to cart.'); } }}>Add to cart <ShoppingCart size={16}/></button>
             <button
               className="primary-btn full-btn"
-              onClick={() => interact('contact this vendor')}
+              onClick={() => void contactSeller(selectedListing)}
             >
               <MessageCircle size={17} /> Contact seller
             </button>
@@ -1291,7 +1298,7 @@ function ListingGrid({
   saved: string[];
   onSave: (id: string) => void;
   onOpen: (l: Listing) => void;
-  onContact: () => void;
+  onContact: (item: Listing) => void;
 }) {
   return (
     <div className="listing-grid">
@@ -1302,13 +1309,7 @@ function ListingGrid({
             onClick={() => onOpen(item)}
             aria-label={'View ' + item.title}
           >
-            <img
-              src={
-                item.image ||
-                'https://images.unsplash.com/photo-1529139574466-a303027c1d8b?auto=format&fit=crop&w=900&q=80'
-              }
-              alt={item.title}
-            />
+            {item.image ? <img src={item.image} alt={item.title}/> : <span className="listing-no-image">No photo uploaded</span>}
             <span className="listing-tag">{item.category}</span>
           </button>
           <button
@@ -1337,7 +1338,7 @@ function ListingGrid({
             </div>
             <div className="listing-bottom">
               <b>{money(item.price)}</b>
-              <button onClick={onContact} aria-label="Contact seller">
+              <button onClick={() => onContact(item)} aria-label="Contact seller">
                 <MessageCircle size={16} />
               </button>
             </div>
