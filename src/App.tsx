@@ -234,6 +234,7 @@ export default function App() {
           ...prev,
         ]);
       setShowListingForm(false);
+      setListingImage(null);
       setForm({
         title: '',
         category: 'Product',
@@ -803,7 +804,7 @@ export default function App() {
                     </div>
                   </article>
                 ))}
-              </div>
+              </div>}
             </>
           )}
           {!memberPanel && active === 'Community' && (
