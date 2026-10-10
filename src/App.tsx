@@ -22,6 +22,12 @@ import {
   Sparkles,
   ShieldCheck,
   ArrowUpRight,
+  Bookmark,
+  ShoppingCart,
+  Repeat2,
+  ThumbsUp,
+  UserRound,
+  BadgeCheck,
 } from 'lucide-react';
 
 type Listing = {
@@ -48,6 +54,9 @@ type Post = {
   author: string;
   created_at: string;
   category: string;
+  image_url?: string | null;
+  author_id?: string;
+  is_verified?: boolean;
 };
 const starterListings: Listing[] = [];
 const starterGroups: Group[] = [];
@@ -67,7 +76,7 @@ export default function App() {
   const [listings, setListings] = useState<Listing[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
-  const [saved, setSaved] = useState<string[]>([]);
+  const [saved, setSaved] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem('ccc-saved') || '[]'); } catch { return []; } });
   const [active, setActive] = useState('Discover');
   const [category, setCategory] = useState('All');
   const [query, setQuery] = useState('');
@@ -111,6 +120,8 @@ export default function App() {
   const [comments, setComments] = useState<Record<string,any[]>>({});
   const [commentText, setCommentText] = useState<Record<string,string>>({});
   const [cart, setCart] = useState<Listing[]>(() => { try { return JSON.parse(localStorage.getItem('ccc-cart') || '[]'); } catch { return []; } });
+  useEffect(() => { localStorage.setItem('ccc-cart', JSON.stringify(cart)); }, [cart]);
+  useEffect(() => { localStorage.setItem('ccc-saved', JSON.stringify(saved)); }, [saved]);
   useEffect(() => {
     let live = true;
     Promise.all([
@@ -396,7 +407,7 @@ export default function App() {
           <button onClick={() => { setShowCart(true); setMenuOpen(false); }}>Shopping cart ({cart.length}) <ShoppingCart size={16}/></button>
           <button onClick={() => { setShowPeople(true); setMenuOpen(false); }}>Find people <UserRound size={16}/></button>
           <button onClick={() => { void openMemberPanel('messages'); setMenuOpen(false); }}>Messages <MessageCircle size={16}/></button>
-          {(user?.email||'').toLowerCase()==='princewillobongha@gmail.com' && <button onClick={() => { void openAdmin(); setMenuOpen(false); }}>Admin verification <ShieldCheck size={16}/></button>
+          {(user?.email||'').toLowerCase()==='princewillobongha@gmail.com' && <button onClick={() => { void openAdmin(); setMenuOpen(false); }}>Admin verification <ShieldCheck size={16}/></button>}
         </div>
       )}
       <div className="page-wrap">
