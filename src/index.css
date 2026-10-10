@@ -1866,3 +1866,8 @@ select:focus-visible {
   .group-avatar-change { flex-basis: 100%; }
   .post-actions { gap: 9px; }
 }
+
+/* Logo-only transparent crop of the user's original artwork */
+.brand-logo-only { width: 76px; height: 64px; flex: 0 0 76px; min-width: 0; overflow: visible; display: flex; align-items: center; justify-content: center; }
+.brand-logo-only img { position: static; width: 76px; height: 60px; max-width: none; object-fit: contain; mix-blend-mode: normal; filter: hue-rotate(42deg) saturate(1.12); }
+@media (max-width:760px) { .brand-logo-only { width: 54px; height: 52px; flex-basis: 54px; } .brand-logo-only img { width: 54px; height: 48px; } }
