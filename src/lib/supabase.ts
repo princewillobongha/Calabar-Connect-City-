@@ -18,6 +18,16 @@ const currentUser = async () => {
 const profileName = (u: any) => u?.user_metadata?.display_name || u?.user_metadata?.full_name || u?.email?.split('@')[0] || 'Calabar Member';
 const slugify = (s: string) => s.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'local-business';
 const asItem = (x: any) => ({...x, id:x.id, title:x.title, category:x.category, price: x.price_ngn ? '₦'+Number(x.price_ngn).toLocaleString('en-NG') : 'Ask for price', location:x.vendor?.address || x.vendor?.area || 'Calabar, Cross River', description:x.description || '', image:x.image_urls?.[0] || x.vendor?.cover_image_url || '', vendor:x.vendor?.business_name || 'Calabar vendor', kind:x.category || 'Product'});
+export async function uploadImage(file: File) {
+  const user = await currentUser();
+  if (!file.type.startsWith('image/')) fail('Choose an image file.');
+  if (file.size > 10 * 1024 * 1024) fail('Images must be 10 MB or smaller.');
+  const ext = (file.name.split('.').pop() || 'jpg').replace(/[^a-z0-9]/gi,'').toLowerCase();
+  const key = user.id + '/' + crypto.randomUUID() + '.' + ext;
+  const { error } = await supabase.storage.from('community-media').upload(key, file, { upsert: false, contentType: file.type });
+  if (error) fail(error.message);
+  return supabase.storage.from('community-media').getPublicUrl(key).data.publicUrl;
+}
 async function get(path: string) {
   if (path === '/api/listings') {
     const {data,error}=await supabase.from('listings').select('*, vendor:vendors(*)').eq('is_available',true).order('created_at',{ascending:false}).limit(100);
@@ -27,6 +37,22 @@ async function get(path: string) {
     const {data,error}=await supabase.from('community_groups').select('*, group_members(count)').order('created_at',{ascending:true});
     const items=ensure(data,error).map((g:any)=>({id:g.id,name:g.name,category:g.name.toLowerCase().includes('food')?'Food':g.name.toLowerCase().includes('fashion')?'Fashion':g.name.toLowerCase().includes('job')?'Jobs':'Marketplace',description:g.description||'',members:g.group_members?.[0]?.count||0}));
     return {data:{items}};
+  }
+  if (path === '/api/people') {
+    const q = new URLSearchParams(path.split('?')[1] || '').get('q') || '';
+    const {data,error}=await supabase.from('profiles').select('id,username,display_name,avatar_url,bio,is_verified').ilike('username','%'+q.replace(/[%_]/g,'')+'%').limit(30);
+    return {data:{items:ensure(data,error)}};
+  }
+  if (path.startsWith('/api/profile')) {
+    const user=await currentUser();
+    const {data,error}=await supabase.from('profiles').select('*').eq('id',user.id).maybeSingle();
+    if(error) fail(error.message);
+    return {data:{item:data || {id:user.id,username:user.email?.split('@')[0] || '',display_name:profileName(user),avatar_url:'',bio:''}}};
+  }
+  if (path.startsWith('/api/comments/')) {
+    const postId=path.split('/')[3];
+    const {data,error}=await supabase.from('community_comments').select('*, author_profile:profiles!community_comments_author_id_fkey(username,display_name,avatar_url,is_verified)').eq('post_id',postId).order('created_at',{ascending:true});
+    return {data:{items:ensure(data,error)}};
   }
   if (path === '/api/posts') {
     const {data,error}=await supabase.from('community_posts').select('*, author_profile:profiles!community_posts_author_id_fkey(display_name,username)').order('created_at',{ascending:false}).limit(80);
@@ -74,6 +100,40 @@ async function post(path: string, body: any) {
     const numeric=Number(String(body.price||'').replace(/[^0-9.]/g,''))||0;
     const {data,error}=await supabase.from('listings').insert({vendor_id:vendor.id,title:body.title,description:body.description,price_ngn:numeric,image_urls:body.image?[body.image]:[],category:body.category||'Product'}).select('*, vendor:vendors(*)').single();
     return {data:{item:asItem(ensure(data,error))}};
+  }
+  if(path==='/api/profile'){
+    const username=String(body.username||'').trim().toLowerCase().replace(/^@/,'');
+    if(!/^[a-z0-9_.]{3,24}$/.test(username)) fail('Username must be 3–24 characters using letters, numbers, dots or underscores.');
+    const {data,error}=await supabase.from('profiles').upsert({id:user.id,username,display_name:String(body.display_name||'').trim()||username,full_name:String(body.full_name||'').trim()||null,bio:String(body.bio||'').trim(),avatar_url:body.avatar_url||null,updated_at:new Date().toISOString()},{onConflict:'id'}).select('*').single();
+    return {data:{item:ensure(data,error)}};
+  }
+  if(path==='/api/groups'){
+    const name=String(body.name||'').trim();
+    if(name.length<3) fail('Group name must be at least 3 characters.');
+    const slug=slugify(name)+'-'+user.id.slice(0,6);
+    const {data,error}=await supabase.from('community_groups').insert({owner_id:user.id,name,slug,description:String(body.description||'').trim(),visibility:body.visibility==='private'?'private':'public'}).select('*').single();
+    const group=ensure(data,error);
+    const {error:memberError}=await supabase.from('group_members').upsert({group_id:group.id,user_id:user.id,role:'owner',status:'active'},{onConflict:'group_id,user_id'});
+    if(memberError) fail(memberError.message);
+    return {data:{item:{id:group.id,name:group.name,description:group.description||'',members:1,category:'Community'}}};
+  }
+  if(path.startsWith('/api/comments/')){
+    const postId=path.split('/')[3];
+    const {data,error}=await supabase.from('community_comments').insert({post_id:postId,author_id:user.id,text:String(body.text||'').trim(),image_url:body.image_url||null}).select('*, author_profile:profiles!community_comments_author_id_fkey(username,display_name,avatar_url,is_verified)').single();
+    return {data:{item:ensure(data,error)}};
+  }
+  const reactionMatch=path.match(/^\/api\/posts\/([^/]+)\/like$/);
+  if(reactionMatch){
+    const postId=reactionMatch[1];
+    const {data:existing,error:ee}=await supabase.from('community_post_reactions').select('*').eq('post_id',postId).eq('user_id',user.id).maybeSingle();
+    if(ee) fail(ee.message);
+    if(existing){const {error}=await supabase.from('community_post_reactions').delete().eq('post_id',postId).eq('user_id',user.id);if(error)fail(error.message);return {data:{liked:false}};}
+    const {error}=await supabase.from('community_post_reactions').insert({post_id:postId,user_id:user.id});if(error)fail(error.message);return {data:{liked:true}};
+  }
+  if(path.startsWith('/api/posts/')&&path.endsWith('/share')){
+    const postId=path.split('/')[3];
+    const {error}=await supabase.from('community_post_shares').upsert({post_id:postId,user_id:user.id},{onConflict:'post_id,user_id'});
+    if(error) fail(error.message);return {data:{ok:true}};
   }
   if(path==='/api/posts'){
     const {data,error}=await supabase.from('community_posts').insert({author_id:user.id,text:body.text,category:body.category||'Community'}).select('*, author_profile:profiles!community_posts_author_id_fkey(display_name,username)').single();
