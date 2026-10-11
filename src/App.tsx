@@ -1314,6 +1314,7 @@ function ListingGrid({
   onOpen,
   onContact,
   onOpenSeller,
+  currentUserId,
 }: {
   items: Listing[];
   saved: string[];
