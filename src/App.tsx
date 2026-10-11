@@ -1331,7 +1331,13 @@ export default function App() {
           </div>
         </div>
       )}
-      <nav className="bottom-nav" aria-label="Primary navigation"><button className={active==='Discover'?'active':''} onClick={()=>{setActive('Discover');setSelectedGroup(null);}}><Sparkles size={19}/><span>Home</span></button><button className={active==='Marketplace'?'active':''} onClick={()=>{setActive('Marketplace');setSelectedGroup(null);}}><ShoppingBag size={19}/><span>Market</span></button><button className={active==='Search'?'active':''} onClick={()=>{setActive('Search');setSelectedGroup(null);setPeopleQuery('');setPeople([]);}}><Search size={21}/><span>Search</span></button><button className={active==='Community'?'active':''} onClick={()=>{setActive('Community');setSelectedGroup(null);}}><Heart size={19}/><span>Community</span></button><button className={active==='Groups'?'active':''} onClick={()=>{setActive('Groups');setSelectedGroup(null);}}><Users size={19}/><span>Groups</span></button></nav>
+      <nav className="bottom-nav" aria-label="Primary navigation">
+        <button className={active==='Discover'?'active':''} onClick={()=>{setActive('Discover');setSelectedGroup(null);setMemberPanel(null);}}><Sparkles size={19}/><span>Home</span></button>
+        <button className={active==='Community'?'active':''} onClick={()=>{setActive('Community');setSelectedGroup(null);setMemberPanel(null);}}><Heart size={19}/><span>Community</span></button>
+        <button className={active==='Marketplace'?'active':''} onClick={()=>{setActive('Marketplace');setSelectedGroup(null);setMemberPanel(null);}}><ShoppingBag size={19}/><span>Market</span></button>
+        <button className={memberPanel==='messages'?'active':''} onClick={()=>void openMemberPanel('messages')}><MessageCircle size={19}/><span>Messages</span></button>
+        <button onClick={()=>{if(!user){setShowAuth(true);return;}void openPublicProfile(user?.userId||user?.id);}}><UserRound size={19}/><span>Profile</span></button>
+      </nav>
       <footer className="site-footer">
         <span>© 2026 Calabar Connect City</span>
         <span>Built for local discovery in Calabar, Cross River State.</span>
