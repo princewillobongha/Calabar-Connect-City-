@@ -1993,3 +1993,5 @@ select:focus-visible {
   .listing-actions { gap:5px; flex-wrap:wrap; justify-content:flex-end; }
   .listing-status-button { font-size:10px; padding:5px 6px !important; }
 }
+
+.sold-status-inline { display:inline-flex; align-items:center; margin:0 0 8px; padding:6px 10px; border-radius:6px; background:#b4232d; color:#fff; font-size:11px; font-weight:900; letter-spacing:.1em; }
