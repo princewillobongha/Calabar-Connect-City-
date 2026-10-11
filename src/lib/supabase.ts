@@ -15,7 +15,7 @@ const currentUser = async () => {
   if (error || !data.user) fail('Please sign in to continue.');
   return data.user;
 };
-const profileName = (u: any) => u?.user_metadata?.display_name || u?.user_metadata?.full_name || u?.email?.split('@')[0] || 'Calabar Member';
+const profileName = (u: any) => u?.user_metadata?.display_name || u?.user_metadata?.full_name || 'Calabar Member';
 const slugify = (s: string) => s.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'local-business';
 const normalizeWhatsApp = (input: string): string => {
   const raw=String(input||'').trim(); if(!raw) return '';
@@ -35,7 +35,7 @@ const normalizeWhatsApp = (input: string): string => {
   if(digits.length<10||digits.length>15) return '';
   return 'https://wa.me/'+digits;
 };
-const asItem = (x: any) => ({...x, id:x.id, vendor_id:x.vendor_id, vendor_owner_id:x.vendor?.owner_id, title:x.title, category:x.category, price: x.price_ngn ? '₦'+Number(x.price_ngn).toLocaleString('en-NG') : 'Ask for price', location:x.vendor?.address || x.vendor?.area || 'Calabar, Cross River', description:x.description || '', images:Array.isArray(x.image_urls)?x.image_urls:[], image:x.image_urls?.[0] || '', vendor:x.owner_profile?.display_name || x.owner_profile?.username || x.vendor?.business_name || 'Calabar vendor', is_verified:!!x.owner_profile?.is_verified && (!x.owner_profile?.verified_until || new Date(x.owner_profile.verified_until).getTime()>Date.now()), order_count:Number(x.order_count||0), available_until:x.available_until||null, availability_note:x.availability_note||'', kind:x.category || 'Product'});
+const asItem = (x: any) => ({...x, id:x.id, vendor_id:x.vendor_id, vendor_owner_id:x.vendor?.owner_id, title:x.title, category:x.category, price: x.price_ngn ? '₦'+Number(x.price_ngn).toLocaleString('en-NG') : 'Ask for price', location:x.vendor?.address || x.vendor?.area || 'Calabar, Cross River', description:x.description || '', images:Array.isArray(x.image_urls)?x.image_urls:[], image:x.image_urls?.[0] || '', vendor:x.owner_profile?.display_name || x.owner_profile?.username || x.vendor?.business_name || 'Calabar vendor', is_verified:!!x.owner_profile?.is_verified && (!x.owner_profile?.verified_until || new Date(x.owner_profile.verified_until).getTime()>Date.now()), rating_average:Number(x.owner_profile?.rating_average||0), rating_count:Number(x.owner_profile?.rating_count||0), order_count:Number(x.order_count||0), available_until:x.available_until||null, availability_note:x.availability_note||'', kind:x.category || 'Product'});
 export async function uploadImage(file: File) {
   const user = await currentUser();
   if (!file.type.startsWith('image/')) fail('Choose an image file.');
@@ -51,7 +51,11 @@ async function get(path: string) {
     const rows=ensure(data,error); const ownerIds=[...new Set(rows.map((x:any)=>x.vendor?.owner_id).filter(Boolean))];
     const {data:owners,error:ownerError}=ownerIds.length?await supabase.from('profiles').select('id,username,display_name,is_verified,verified_until').in('id',ownerIds):{data:[],error:null}; if(ownerError)fail(ownerError.message);
     const ownerMap=new Map((owners||[]).map((p:any)=>[p.id,p]));
-    return {data:{items:rows.map((x:any)=>asItem({...x,owner_profile:ownerMap.get(x.vendor?.owner_id)}))}};
+    const {data:ratings,error:ratingsError}=ownerIds.length?await supabase.from('profile_ratings').select('profile_id,rating').in('profile_id',ownerIds):{data:[],error:null};
+    if(ratingsError) fail(ratingsError.message);
+    const ratingMap=new Map<string,{sum:number,count:number}>();
+    for(const rating of (ratings||[]) as any[]){const entry=ratingMap.get(rating.profile_id)||{sum:0,count:0};entry.sum+=Number(rating.rating);entry.count++;ratingMap.set(rating.profile_id,entry);}
+    return {data:{items:rows.map((x:any)=>{const ownerId=x.vendor?.owner_id;const owner=ownerMap.get(ownerId)||{};const rating=ratingMap.get(ownerId)||{sum:0,count:0};return asItem({...x,owner_profile:{...owner,rating_average:rating.count?rating.sum/rating.count:0,rating_count:rating.count}});})}};
   }
   const contactMatch = path.match(/^\/api\/listings\/([^/]+)\/contact$/);
   if (contactMatch) {
@@ -348,12 +352,12 @@ export const auth = {
     const {data}=await supabase.auth.getUser();
     if(!data.user)return null;
     const {data:profile}=await supabase.from('profiles').select('username,display_name,full_name,avatar_url,bio,is_verified').eq('id',data.user.id).maybeSingle();
-    return {userId:data.user.id,email:data.user.email,name:profile?.display_name||profileName(data.user),username:profile?.username||'',avatar_url:profile?.avatar_url||'',bio:profile?.bio||'',is_verified:!!profile?.is_verified,...data.user};
+    const emailPrefix=String(data.user.email||'').split('@')[0].toLowerCase(); const displayName=profile?.display_name&&profile.display_name.toLowerCase()!==emailPrefix?profile.display_name:(profile?.username||'Calabar Member'); return {userId:data.user.id,email:data.user.email,name:displayName,username:profile?.username||'',avatar_url:profile?.avatar_url||'',bio:profile?.bio||'',is_verified:!!profile?.is_verified,...data.user};
   },
   async signIn(email?:string,password?:string,mode:'signin'|'signup'='signin'){
     if(!email||!password) throw new Error('Enter your email and password.');
     const result=mode==='signup'
-      ? await supabase.auth.signUp({email,password,options:{data:{display_name:email.split('@')[0]},emailRedirectTo:'https://calabar-connect-city-omega.vercel.app/'}})
+      ? await supabase.auth.signUp({email,password,options:{data:{display_name:'Calabar Member'},emailRedirectTo:'https://calabar-connect-city-omega.vercel.app/'}})
       : await supabase.auth.signInWithPassword({email,password});
     if(result.error)throw result.error;
     if(!result.data.user)throw new Error('Could not complete authentication.');
