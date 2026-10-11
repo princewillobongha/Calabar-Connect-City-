@@ -1307,7 +1307,9 @@ export default function App() {
               {selectedListing.category} · LOCAL LISTING
             </span>
             <h2>{selectedListing.title}</h2>
+            {selectedListing.sale_status==='sold'&&<span className="sold-status-inline">SOLD</span>}
             <div className="detail-price">{money(selectedListing.price)}</div>
+            {selectedListing.vendor_owner_id===(user?.userId||user?.id)&&<button className="listing-status-button" onClick={()=>void markListingSold(selectedListing)}>{selectedListing.sale_status==='sold'?'Mark available again':'Mark as SOLD'}</button>}
             <p>{selectedListing.description}</p>
             <div className="detail-meta">
               <MapPin size={16} />
@@ -1315,12 +1317,13 @@ export default function App() {
             </div>
             <div className="detail-meta"><Store size={16}/><button className="vendor-name-link" onClick={()=>selectedListing.vendor_owner_id&&void openPublicProfile(selectedListing.vendor_owner_id)}>{selectedListing.vendor||'Local vendor'}</button></div>
             {(selectedListing.images||[]).slice(1).map((imageUrl,i)=><img key={imageUrl+i} className="detail-gallery-image" src={imageUrl} alt={selectedListing.title+' photo '+(i+2)}/>)}
-            <button className="ghost-btn full-btn" onClick={() => { if(requireMember('add items to your cart')) { setCart(v=>v.some(item=>item.id===selectedListing.id)?v:[...v,selectedListing]); setNotice(cart.some(item=>item.id===selectedListing.id)?'This product is already in your cart.':'Added to cart.'); } }}>Add to cart <ShoppingCart size={16}/></button>
+            <button className="ghost-btn full-btn" disabled={selectedListing.sale_status==='sold'} onClick={() => { if(requireMember('add items to your cart')) { setCart(v=>v.some(item=>item.id===selectedListing.id)?v:[...v,selectedListing]); setNotice(cart.some(item=>item.id===selectedListing.id)?'This product is already in your cart.':'Added to cart.'); } }}>{selectedListing.sale_status==='sold'?'Sold · unavailable':'Add to cart'} <ShoppingCart size={16}/></button>
             <button
               className="primary-btn full-btn"
+              disabled={selectedListing.sale_status==='sold'}
               onClick={() => void contactSeller(selectedListing)}
             >
-              <MessageCircle size={17} /> Contact seller
+              <MessageCircle size={17} /> {selectedListing.sale_status==='sold'?'Item sold':'Contact seller'}
             </button>
             <small className="fine-print">
               Always verify details with the seller before making payment.
