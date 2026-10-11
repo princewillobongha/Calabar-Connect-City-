@@ -86,9 +86,12 @@ async function get(path: string) {
     const {data:profiles,error:profilesError}=ids.length?await supabase.from('profiles').select('id,username,display_name,avatar_url,is_verified,verified_until').in('id',ids):{data:[],error:null};
     if(profilesError) fail(profilesError.message);
     const {data:{user:viewer}}=await supabase.auth.getUser();
+    const postIds=(posts||[]).map((p:any)=>p.id);
+    const {data:groupLikes,error:likesError}=postIds.length?await supabase.from('community_group_post_reactions').select('post_id,user_id').in('post_id',postIds):{data:[],error:null};
+    if(likesError) fail(likesError.message);
     const isMember=!!viewer&&(memberRows||[]).some((m:any)=>m.user_id===viewer.id);
     const profileMap=new Map((profiles||[]).map((p:any)=>[p.id,p]));
-    return {data:{item:{...group,members:(memberRows||[]).length,is_member:isMember,is_owner:!!viewer&&group.owner_id===viewer.id,posts:(posts||[]).map((p:any)=>{const a:any=profileMap.get(p.author_id)||{};return {...p,author:a.display_name||a.username||'Calabar member',avatar_url:a.avatar_url||null,is_verified:!!a.is_verified&&(!a.verified_until||new Date(a.verified_until).getTime()>Date.now())};}),member_list:(memberRows||[]).map((m:any)=>({...m,profile:profileMap.get(m.user_id)||{}}))}}};
+    return {data:{item:{...group,members:(memberRows||[]).length,is_member:isMember,is_owner:!!viewer&&group.owner_id===viewer.id,posts:(posts||[]).map((p:any)=>{const a:any=profileMap.get(p.author_id)||{};const likes=(groupLikes||[]).filter((x:any)=>x.post_id===p.id);return {...p,author:a.display_name||a.username||'Calabar member',avatar_url:a.avatar_url||null,is_verified:!!a.is_verified&&(!a.verified_until||new Date(a.verified_until).getTime()>Date.now()),like_count:likes.length,liked_by_me:!!viewer&&likes.some((x:any)=>x.user_id===viewer.id)};}),member_list:(memberRows||[]).map((m:any)=>({...m,profile:profileMap.get(m.user_id)||{}}))}}};
   }
   if (path === '/api/groups') {
     const {data,error}=await supabase.from('community_groups').select('*').eq('visibility','public').order('created_at',{ascending:false});
@@ -239,11 +242,23 @@ async function post(path: string, body: any) {
     if(memberError) fail('Group was created but membership could not be added: '+memberError.message);
     return {data:{item:{id:group.id,name:group.name,description:group.description||'',avatar_url:group.avatar_url||null,owner_id:group.owner_id,members:1,category:'Community'}}};
   }
+  const groupPostLikeMatch=path.match(/^\/api\/groups\/([^/]+)\/posts\/([^/]+)\/like$/);
+  if(groupPostLikeMatch){
+    const groupId=groupPostLikeMatch[1],postId=groupPostLikeMatch[2];
+    const {data:existing,error:lookupError}=await supabase.from('community_group_post_reactions').select('post_id').eq('post_id',postId).eq('user_id',user.id).maybeSingle();
+    if(lookupError) fail(lookupError.message);
+    if(existing){const {error}=await supabase.from('community_group_post_reactions').delete().eq('post_id',postId).eq('user_id',user.id);if(error)fail(error.message);return {data:{liked:false}};}
+    const {error}=await supabase.from('community_group_post_reactions').insert({post_id:postId,user_id:user.id});
+    if(error)fail(error.message);return {data:{liked:true}};
+  }
   const groupPostMatch=path.match(/^\/api\/groups\/([^/]+)\/posts$/);
   if(groupPostMatch){
     const text=String(body.text||'').trim();if(!text)fail('Write something before posting in the group.');
-    const {data,error}=await supabase.from('community_group_posts').insert({group_id:groupPostMatch[1],author_id:user.id,text,image_url:body.image_url||null}).select('*, author_profile:profiles!community_group_posts_author_id_fkey(id,username,display_name,avatar_url,is_verified)').single();
-    const p=ensure(data,error);return {data:{item:{...p,author:p.author_profile?.display_name||p.author_profile?.username||'Calabar member',avatar_url:p.author_profile?.avatar_url||null,is_verified:!!p.author_profile?.is_verified}}};
+    const {data,error}=await supabase.from('community_group_posts').insert({group_id:groupPostMatch[1],author_id:user.id,text,image_url:body.image_url||null}).select('*').single();
+    const p=ensure(data,error);
+    const {data:author,error:authorError}=await supabase.from('profiles').select('id,username,display_name,avatar_url,is_verified,verified_until').eq('id',user.id).maybeSingle();
+    if(authorError) fail(authorError.message);
+    return {data:{item:{...p,author:author?.display_name||author?.username||'Calabar member',avatar_url:author?.avatar_url||null,is_verified:!!author?.is_verified&&(!author?.verified_until||new Date(author.verified_until).getTime()>Date.now()),like_count:0,liked_by_me:false}}};
   }
   const groupUpdateMatch=path.match(/^\/api\/groups\/([^/]+)\/update$/);
   if(groupUpdateMatch){
