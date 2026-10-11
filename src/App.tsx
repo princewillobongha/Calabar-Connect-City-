@@ -635,7 +635,7 @@ export default function App() {
                     <span className="float-icon">
                       <Store size={18} />
                     </span>
-                    <button className="shop-local-link" onClick={()=>{if(!requireMember('Sign in to view your groups.'))return;void api.get('/api/groups/mine').then(r=>{const mine=r.data?.items||[];if(!mine.length){setNotice('You have not joined any groups yet. Open Groups to discover and join one.');setActive('Groups');return;}setMemberItems(mine);setMemberPanel(null);setShowPeople(false);setActive('Groups');setMyGroupsOpen(true);}).catch((e:any)=>setNotice(e?.message||'Could not load your groups.'));}}><b>Shop local</b><small>Choose one of your groups</small></button>
+                    <button className="shop-local-link" onClick={()=>{setActive('Marketplace');setCategory('All');}}><b>Shop local</b><small>Browse products and services in Calabar</small></button>
                     <span className="float-arrow"><ArrowUpRight size={15} /></span>
                   </div>
                   <div className="hero-sparkle">✳</div>
@@ -681,6 +681,29 @@ export default function App() {
                         </span>
                       </button>
                     ))}
+                </div>
+              </section>
+              <section className="section-block explore-city-section">
+                <div className="section-heading">
+                  <div>
+                    <div className="eyebrow muted">MORE AROUND YOUR CITY</div>
+                    <h2>Explore Calabar</h2>
+                    <p className="section-subtitle">Find people, join conversations and discover local offers.</p>
+                  </div>
+                </div>
+                <div className="category-grid explore-city-grid">
+                  <button className="category-card" onClick={()=>{setPeopleQuery('');setActive('Search');void api.get('/api/people').then(r=>setPeople(r.data?.items||[])).catch(()=>setNotice('Could not load members. Please try again.'));}}>
+                    <span className="category-icon blue"><Users size={22}/></span><b>People</b><span>Follow members and add friends <ArrowUpRight size={14}/></span>
+                  </button>
+                  <button className="category-card" onClick={()=>setActive('Groups')}>
+                    <span className="category-icon green"><Users size={22}/></span><b>Community groups</b><span>Join shared interests <ArrowUpRight size={14}/></span>
+                  </button>
+                  <button className="category-card" onClick={()=>setActive('Community')}>
+                    <span className="category-icon rose"><MessageCircle size={22}/></span><b>Community board</b><span>See what people are saying <ArrowUpRight size={14}/></span>
+                  </button>
+                  <button className="category-card" onClick={()=>{setCategory('Services');setActive('Marketplace');}}>
+                    <span className="category-icon peach"><Store size={22}/></span><b>Local services</b><span>Explore local listings <ArrowUpRight size={14}/></span>
+                  </button>
                 </div>
               </section>
               <section className="section-block">
