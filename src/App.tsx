@@ -86,6 +86,7 @@ export default function App() {
   const [user, setUser] = useState<any>(null);
   const [, setLoading] = useState(true);
   const [listings, setListings] = useState<Listing[]>([]);
+  const [businesses, setBusinesses] = useState<any[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
   const [saved, setSaved] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem('ccc-saved') || '[]'); } catch { return []; } });
@@ -160,6 +161,7 @@ export default function App() {
   },[user?.userId,user?.id]);
   useEffect(()=>{const anyModal=showAuth||showProfile||showListingForm||showPostForm||showGroupForm||showCart||showPeople||showAdmin||showSubscriptions||!!publicProfile||!!selectedListing||!!selectedPost||myGroupsOpen;document.body.style.overflow=anyModal?'hidden':'';const onKey=(e:KeyboardEvent)=>{if(e.key==='Escape'){setShowAuth(false);setShowProfile(false);setShowListingForm(false);setShowPostForm(false);setShowGroupForm(false);setShowCart(false);setShowPeople(false);setShowAdmin(false);setShowSubscriptions(false);setPublicProfile(null);setSelectedListing(null);setSelectedPost(null);setMyGroupsOpen(false);}};window.addEventListener('keydown',onKey);return()=>{document.body.style.overflow='';window.removeEventListener('keydown',onKey);};},[showAuth,showProfile,showListingForm,showPostForm,showGroupForm,showCart,showPeople,showAdmin,showSubscriptions,publicProfile,selectedListing,selectedPost,myGroupsOpen]);
   useEffect(()=>{setSelectedListing(null);setSelectedPost(null);setPublicProfile(null);setShowProfile(false);setShowListingForm(false);setShowPostForm(false);setShowCart(false);setShowPeople(false);setShowAdmin(false);setShowSubscriptions(false);setMemberPanel(null);},[active]);
+  useEffect(()=>{if(active!=='Businesses')return;let live=true;api.get('/api/discover/businesses').then(r=>{if(live)setBusinesses(r.data?.items||[]);}).catch((e:any)=>{if(live)setNotice(e?.message||'Could not load local businesses.');});return()=>{live=false;};},[active]);
   useEffect(() => {
     let live = true;
     Promise.all([
@@ -387,7 +389,7 @@ export default function App() {
       setBusy(false);
     }
   };
-  const nav = ['Discover', 'Marketplace', 'Community', 'Groups', 'Jobs'];
+  const nav = ['Discover', 'Marketplace', 'Community', 'Groups', 'Businesses', 'Jobs'];
   return (
     <div className="app-shell">
       <header className="topbar">
@@ -704,8 +706,8 @@ export default function App() {
                   <button className="category-card" onClick={()=>setActive('Community')}>
                     <span className="category-icon rose"><MessageCircle size={22}/></span><b>Community board</b><span>See what people are saying <ArrowUpRight size={14}/></span>
                   </button>
-                  <button className="category-card" onClick={()=>{setCategory('Services');setActive('Marketplace');}}>
-                    <span className="category-icon peach"><Store size={22}/></span><b>Local services</b><span>Explore local listings <ArrowUpRight size={14}/></span>
+                  <button className="category-card" onClick={()=>setActive('Businesses')}>
+                    <span className="category-icon peach"><Store size={22}/></span><b>Local businesses</b><span>Discover shops and services <ArrowUpRight size={14}/></span>
                   </button>
                 </div>
               </section>
@@ -762,6 +764,21 @@ export default function App() {
             </>
           )}
           {!memberPanel && active === 'Search' && <section className="search-page"><div className="page-title"><div><h1>Calabar Connect City</h1></div></div><form className="search-page-form" onSubmit={e=>{e.preventDefault();void searchPeople();}}><Search size={20}/><input value={peopleQuery} onChange={e=>setPeopleQuery(e.target.value)} placeholder="Search Calabar Connect City"/><button className="primary-btn" type="submit">Search</button></form><div className="search-results-list">{people.filter((person:any)=>person.id!==(user?.userId||user?.id)).map((person:any)=><article className="search-person-card" key={person.id}>{person.avatar_url?<img src={person.avatar_url} alt=""/>:<span className="avatar">{(person.display_name||person.username||'M').slice(0,1).toUpperCase()}</span>}<div><b>{person.display_name||person.full_name||person.username} {person.is_verified&&<BadgeCheck size={15} className="verified-badge"/>}</b><small>@{person.username||'member'}</small><p>{person.bio||person.city||'Calabar Connect City member'}</p><div className="people-card-actions"><button className="primary-btn" onClick={()=>void openPublicProfile(person.id)}>View profile</button><button className="ghost-btn" onClick={()=>void togglePersonFollow(person)}>{person.is_following?'Following · Unfollow':'Follow'}</button><button className="ghost-btn" disabled={person.friend_status==='pending'&&person.friend_request_direction==='sent'||person.friend_status==='accepted'} onClick={()=>void sendFriendRequest(person)}>{person.friend_status==='accepted'?'Friends':person.friend_status==='pending'?(person.friend_request_direction==='received'?'Accept request':'Request sent'):'Add friend'}</button></div></div></article>)}{people.length===0&&<div className="empty-state"><Search size={28}/><h3>{peopleQuery?'No members found':'No members yet'}</h3><p>{peopleQuery?'Try a different name or username.':'New members will appear here when they create accounts.'}</p></div>}</div></section>}
+          {!memberPanel && active === 'Businesses' && (
+            <section className="business-directory-page">
+              <div className="page-title">
+                <div><div className="eyebrow muted">DISCOVER CALABAR</div><h1>Local businesses & services</h1><p>Explore real businesses and vendors on Calabar Connect City.</p></div>
+                <button className="primary-btn" onClick={()=>{if(requireMember('list a business or item'))setShowListingForm(true);}}><Plus size={16}/> List your business</button>
+              </div>
+              {businesses.length>0?<div className="business-directory-grid">{businesses.map((business:any)=><article className="business-directory-card" key={business.id}>
+                <div className="business-directory-image">{business.cover_image_url||business.latest_listing_image?<img src={business.cover_image_url||business.latest_listing_image} alt={business.business_name}/>:<span><Store size={28}/></span>}<small>{business.category||'Local business'}</small></div>
+                <div className="business-directory-body"><div className="business-directory-title"><h3>{business.business_name||business.owner_name}</h3>{business.is_verified?<BadgeCheck size={17} className="verified-badge" aria-label="Verified business"/>:<span className="not-verified-badge">Not Verified</span>}</div>
+                  <p>{business.description||'A local business on Calabar Connect City.'}</p><div className="business-directory-meta"><MapPin size={14}/>{business.area||business.address||'Calabar, Cross River'}</div><div className="business-directory-meta"><ShoppingBag size={14}/>{business.listing_count||0} active listings</div>
+                  <div className="business-directory-actions"><button className="ghost-btn" onClick={()=>void openPublicProfile(business.owner_id)}>View profile</button><button className="primary-btn" onClick={()=>{setQuery(business.business_name||'');setCategory('All');setActive('Marketplace');}}>View listings</button></div>
+                </div>
+              </article>)}</div>:<div className="empty-state"><Store size={30}/><h3>Local businesses are joining</h3><p>As members create seller profiles, their real businesses will appear here. No demo businesses are shown.</p><button className="primary-btn" onClick={()=>{if(requireMember('list a business or item'))setShowListingForm(true);}}>List the first business</button></div>}
+            </section>
+          )}
           {!memberPanel && active === 'Marketplace' && (
             <>
               <div className="page-title">
