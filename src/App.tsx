@@ -698,6 +698,7 @@ export default function App() {
                 </div>
                 <ListingGrid
                   onRate={(item,rating)=>void rateListingVendor(item,rating)}
+                  onMarkSold={markListingSold}
                   items={listings.slice(0, 4)}
                   saved={saved}
                   onSave={id => {
@@ -772,6 +773,7 @@ export default function App() {
               {filtered.length ? (
                 <ListingGrid
                   onRate={(item,rating)=>void rateListingVendor(item,rating)}
+                  onMarkSold={markListingSold}
                   items={filtered}
                   saved={saved}
                   onSave={id => {
@@ -960,6 +962,7 @@ export default function App() {
               </div>
               <ListingGrid
                   onRate={(item,rating)=>void rateListingVendor(item,rating)}
+                  onMarkSold={markListingSold}
                 items={listings.filter(
                   l => l.category === 'Jobs' || l.kind === 'Job'
                 )}
@@ -1327,6 +1330,7 @@ function ListingGrid({
   onContact,
   onOpenSeller,
   onRate,
+  onMarkSold,
   onDelete,
   currentUserId,
 }: {
@@ -1337,6 +1341,7 @@ function ListingGrid({
   onContact: (item: Listing) => void;
   onOpenSeller: (id: string) => void;
   onRate: (item:Listing,rating:number) => void;
+  onMarkSold: (item:Listing) => void;
   currentUserId?: string;
   onDelete: (id:string) => void;
 }) {
@@ -1375,7 +1380,7 @@ function ListingGrid({
             <small className="listing-order-count">{item.order_count||0} order enquiries</small>
             <div className="listing-bottom">
               <b>{money(item.price)}</b>
-              <div className="listing-actions"><button disabled={item.sale_status==='sold'} onClick={() => onContact(item)} aria-label="Contact seller">{item.sale_status==='sold'?'Sold':<MessageCircle size={16}/>}</button>{item.vendor_owner_id===currentUserId&&<><button className="listing-status-button" onClick={()=>void markListingSold(item)} aria-label={item.sale_status==='sold'?'Mark available':'Mark sold'}>{item.sale_status==='sold'?'Mark available':'Mark sold'}</button><button className="listing-delete-button" onClick={()=>onDelete(item.id)} aria-label="Delete my listing"><X size={16}/></button></>}</div>
+              <div className="listing-actions"><button disabled={item.sale_status==='sold'} onClick={() => onContact(item)} aria-label="Contact seller">{item.sale_status==='sold'?'Sold':<MessageCircle size={16}/>}</button>{item.vendor_owner_id===currentUserId&&<><button className="listing-status-button" onClick={()=>void onMarkSold(item)} aria-label={item.sale_status==='sold'?'Mark available':'Mark sold'}>{item.sale_status==='sold'?'Mark available':'Mark sold'}</button><button className="listing-delete-button" onClick={()=>onDelete(item.id)} aria-label="Delete my listing"><X size={16}/></button></>}</div>
             </div>
           </div>
         </article>
