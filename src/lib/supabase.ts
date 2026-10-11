@@ -404,8 +404,8 @@ async function del(path:string){
     if(group.owner_id!==user.id)fail('Only the group owner can delete this group.');
     const {data:groupPosts,error:postsError}=await supabase.from('community_group_posts').select('id').eq('group_id',groupId);
     if(postsError)fail(postsError.message);
-    const postIds=(groupPosts||[]).map((p:any)=>p.id);
-    if(postIds.length){const {error}=await supabase.from('community_group_post_reactions').delete().in('post_id',postIds);if(error)fail(error.message);}
+    // Group-post reactions are removed by the database's ON DELETE CASCADE
+    // when the owner deletes the group's posts; do not bypass each user's own-like RLS.
     const {error:deletePostsError}=await supabase.from('community_group_posts').delete().eq('group_id',groupId);
     if(deletePostsError)fail(deletePostsError.message);
     const {error:deleteMembersError}=await supabase.from('group_members').delete().eq('group_id',groupId);
