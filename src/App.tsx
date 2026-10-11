@@ -394,6 +394,9 @@ export default function App() {
         <a className="brand brand-logo-only" href="#home" aria-label="Calabar Connect City home" onClick={() => {setActive('Discover');setSelectedGroup(null);}}><img src="/calabar-connect-city-logo.svg" alt="Calabar Connect City" /></a>
   
         <div className="top-actions">
+          <button className="icon-btn header-search" aria-label="Search members" onClick={()=>{setActive('Search');setSelectedGroup(null);setMemberPanel(null);setPeopleQuery('');void api.get('/api/people').then(r=>setPeople(r.data?.items||[])).catch(()=>setNotice('Could not load members. Please try again.'));}}>
+            <Search size={19}/>
+          </button>
           <button
             className="icon-btn notification"
             aria-label="Notifications"
