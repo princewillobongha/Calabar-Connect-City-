@@ -46,6 +46,20 @@ export async function uploadImage(file: File) {
   return supabase.storage.from('community-media').getPublicUrl(key).data.publicUrl;
 }
 async function get(path: string) {
+  if (path === '/api/discover/businesses') {
+    const {data:vendors,error}=await supabase.from('vendors').select('id,owner_id,business_name,category,description,address,area,cover_image_url,is_open,availability_note,created_at').order('created_at',{ascending:false}).limit(100);
+    const rows=ensure(vendors,error);
+    const ownerIds=[...new Set(rows.map((v:any)=>v.owner_id).filter(Boolean))];
+    const vendorIds=rows.map((v:any)=>v.id);
+    const [{data:profiles,error:profileError},{data:listings,error:listingError}]=await Promise.all([
+      ownerIds.length?supabase.from('profiles').select('id,username,display_name,avatar_url,is_verified,verified_until').in('id',ownerIds):Promise.resolve({data:[],error:null}),
+      vendorIds.length?supabase.from('listings').select('id,vendor_id,title,image_urls,category,sale_status,available_until').in('vendor_id',vendorIds).eq('is_available',true).or('available_until.is.null,available_until.gt.'+new Date().toISOString()).order('created_at',{ascending:false}):Promise.resolve({data:[],error:null})
+    ]);
+    if(profileError)fail(profileError.message);if(listingError)fail(listingError.message);
+    const profileMap=new Map((profiles||[]).map((p:any)=>[p.id,p]));
+    const listingRows=listings||[];
+    return {data:{items:rows.map((v:any)=>{const owner:any=profileMap.get(v.owner_id)||{};const products=listingRows.filter((l:any)=>l.vendor_id===v.id);return {...v,owner_name:owner.display_name||owner.username||v.business_name||'Local business',owner_avatar:owner.avatar_url||null,is_verified:!!owner.is_verified&&(!owner.verified_until||new Date(owner.verified_until).getTime()>Date.now()),listing_count:products.length,latest_listing_image:products.find((l:any)=>Array.isArray(l.image_urls)&&l.image_urls.length)?.image_urls?.[0]||null};})}};
+  }
   if (path === '/api/listings') {
     const {data,error}=await supabase.from('listings').select('*, vendor:vendors(id,owner_id,business_name,address,area,cover_image_url)').eq('is_available',true).or('available_until.is.null,available_until.gt.'+new Date().toISOString()).order('created_at',{ascending:false}).limit(100);
     const rows=ensure(data,error); const ownerIds=[...new Set(rows.map((x:any)=>x.vendor?.owner_id).filter(Boolean))];
