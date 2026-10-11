@@ -1974,3 +1974,22 @@ select:focus-visible {
   background: #fff8f8;
 }
 .listing-actions .listing-delete-button:hover { background: #ffecec; }
+
+
+/* Community discovery, listing status, and group ownership controls */
+.people-card-actions { display:flex; flex-wrap:wrap; gap:7px; margin-top:10px; }
+.people-card-actions .primary-btn,.people-card-actions .ghost-btn { min-height:34px; padding:7px 11px; font-size:12px; }
+.listing-image { isolation:isolate; }
+.listing-sold-badge { position:absolute; z-index:2; right:12px; top:12px; padding:7px 10px; border-radius:7px; background:#b4232d; color:#fff; font-size:11px; font-weight:900; letter-spacing:.08em; box-shadow:0 4px 14px #0002; }
+.listing-status-button { border:1px solid #d5e1d4 !important; border-radius:7px; padding:6px 8px !important; color:#31583a !important; background:#f4f8f1 !important; font-size:11px; font-weight:700; white-space:nowrap; }
+.listing-actions button:disabled { opacity:.7; cursor:not-allowed; }
+.danger-outline-btn { display:inline-flex; align-items:center; justify-content:center; gap:7px; border:1px solid #e4b9b9; border-radius:10px; padding:9px 13px; color:#b4232d; background:#fff7f7; font-weight:700; }
+.group-delete-button { margin:0 0 14px; }
+@media (max-width: 620px) {
+  .search-person-card { align-items:flex-start; flex-wrap:wrap; }
+  .search-person-card > div { min-width:calc(100% - 64px); }
+  .people-card-actions { width:100%; }
+  .people-card-actions button { flex:1 1 auto; }
+  .listing-actions { gap:5px; flex-wrap:wrap; justify-content:flex-end; }
+  .listing-status-button { font-size:10px; padding:5px 6px !important; }
+}
