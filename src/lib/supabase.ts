@@ -35,7 +35,7 @@ const normalizeWhatsApp = (input: string): string => {
   if(digits.length<10||digits.length>15) return '';
   return 'https://wa.me/'+digits;
 };
-const asItem = (x: any) => ({...x, id:x.id, vendor_id:x.vendor_id, vendor_owner_id:x.vendor?.owner_id, title:x.title, category:x.category, price: x.price_ngn ? '₦'+Number(x.price_ngn).toLocaleString('en-NG') : 'Ask for price', location:x.vendor?.address || x.vendor?.area || 'Calabar, Cross River', description:x.description || '', images:Array.isArray(x.image_urls)?x.image_urls:[], image:x.image_urls?.[0] || '', vendor:x.owner_profile?.display_name || x.owner_profile?.username || x.vendor?.business_name || 'Calabar vendor', is_verified:!!x.owner_profile?.is_verified && (!x.owner_profile?.verified_until || new Date(x.owner_profile.verified_until).getTime()>Date.now()), rating_average:Number(x.owner_profile?.rating_average||0), rating_count:Number(x.owner_profile?.rating_count||0), order_count:Number(x.order_count||0), available_until:x.available_until||null, availability_note:x.availability_note||'', kind:x.category || 'Product'});
+const asItem = (x: any) => ({...x, id:x.id, vendor_id:x.vendor_id, vendor_owner_id:x.vendor?.owner_id, title:x.title, category:x.category, price: x.price_ngn ? '₦'+Number(x.price_ngn).toLocaleString('en-NG') : 'Ask for price', location:x.vendor?.address || x.vendor?.area || 'Calabar, Cross River', description:x.description || '', images:Array.isArray(x.image_urls)?x.image_urls:[], image:x.image_urls?.[0] || '', vendor:x.owner_profile?.display_name || x.owner_profile?.username || x.vendor?.business_name || 'Calabar vendor', is_verified:!!x.owner_profile?.is_verified && (!x.owner_profile?.verified_until || new Date(x.owner_profile.verified_until).getTime()>Date.now()), rating_average:Number(x.owner_profile?.rating_average||0), rating_count:Number(x.owner_profile?.rating_count||0), order_count:Number(x.order_count||0), available_until:x.available_until||null, availability_note:x.availability_note||'', sale_status:x.sale_status||'available', kind:x.category || 'Product'});
 export async function uploadImage(file: File) {
   const user = await currentUser();
   if (!file.type.startsWith('image/')) fail('Choose an image file.');
@@ -60,8 +60,9 @@ async function get(path: string) {
   const contactMatch = path.match(/^\/api\/listings\/([^/]+)\/contact$/);
   if (contactMatch) {
     const customer=await currentUser();
-    const {data:listing,error:listingError}=await supabase.from('listings').select('id,title,price_ngn,vendor_id,vendor:vendors(owner_id,whatsapp_url)').eq('id',contactMatch[1]).single();
+    const {data:listing,error:listingError}=await supabase.from('listings').select('id,title,price_ngn,sale_status,vendor_id,vendor:vendors(owner_id,whatsapp_url)').eq('id',contactMatch[1]).single();
     if(listingError) fail(listingError.message);
+    if((listing as any).sale_status==='sold') fail('This item has been marked SOLD by the seller.');
     const ownerId=(listing as any).vendor?.owner_id;
     const {data:profile,error:profileError}=ownerId?await supabase.from('profiles').select('whatsapp_url,display_name,username').eq('id',ownerId).maybeSingle():{data:null,error:null};
     if(profileError) fail(profileError.message);
@@ -110,7 +111,21 @@ async function get(path: string) {
     let builder=supabase.from('profiles').select('id,username,display_name,full_name,avatar_url,bio,city,is_verified,verified_until').order('display_name').limit(100);
     if(term) builder=builder.or('username.ilike.%'+term+'%,display_name.ilike.%'+term+'%,full_name.ilike.%'+term+'%');
     const {data,error}=await builder;
-    return {data:{items:ensure(data,error).map((p:any)=>({...p,is_verified:!!p.is_verified&&(!p.verified_until||new Date(p.verified_until).getTime()>Date.now()),verified_until:undefined}))}};
+    const profiles=ensure(data,error);
+    const {data:{user:viewer}}=await supabase.auth.getUser();
+    let followRows:any[]=[]; let friendRows:any[]=[];
+    if(viewer){
+      const [followResult,friendResult]=await Promise.all([
+        supabase.from('community_follows').select('followed_id').eq('follower_id',viewer.id),
+        supabase.from('friend_requests').select('id,sender_id,receiver_id,status').or('sender_id.eq.'+viewer.id+',receiver_id.eq.'+viewer.id)
+      ]);
+      if(followResult.error)fail(followResult.error.message); if(friendResult.error)fail(friendResult.error.message);
+      followRows=followResult.data||[]; friendRows=friendResult.data||[];
+    }
+    return {data:{items:profiles.map((p:any)=>{
+      const request=viewer?friendRows.find((f:any)=>(f.sender_id===viewer.id&&f.receiver_id===p.id)||(f.sender_id===p.id&&f.receiver_id===viewer.id)):null;
+      return {...p,is_verified:!!p.is_verified&&(!p.verified_until||new Date(p.verified_until).getTime()>Date.now()),verified_until:undefined,is_following:!!viewer&&followRows.some((f:any)=>f.followed_id===p.id),friend_status:request?.status||null,friend_request_id:request?.id||null,friend_request_direction:request?(request.sender_id===viewer?.id?'sent':'received'):null};
+    })}};
   }
   const publicProfileMatch = path.match(/^\/api\/profile\/([^/]+)$/);
   if (publicProfileMatch) {
@@ -205,6 +220,15 @@ async function post(path: string, body: any) {
     const {data,error}=await supabase.from('listings').insert({vendor_id:vendor.id,title:body.title,description:body.description,price_ngn:numeric,image_urls:Array.isArray(body.image_urls)?body.image_urls:(body.image?[body.image]:[]),category:body.category||'Product',available_until:body.available_until||null,availability_note:String(body.availability_note||'').trim()||null}).select('*, vendor:vendors(*)').single();
     const created=ensure(data,error); const {data:ownerProfile}=await supabase.from('profiles').select('id,username,display_name,is_verified,verified_until').eq('id',user.id).maybeSingle();
     return {data:{item:asItem({...created,owner_profile:ownerProfile})}};
+  }
+  const listingStatusMatch=path.match(/^\/api\/listings\/([^/]+)\/status$/);
+  if(listingStatusMatch){
+    const status=body.sale_status==='sold'?'sold':'available';
+    const {data:listing,error:lookupError}=await supabase.from('listings').select('id,vendor_id,vendor:vendors(owner_id)').eq('id',listingStatusMatch[1]).single();
+    if(lookupError)fail(lookupError.message);
+    if((listing as any).vendor?.owner_id!==user.id)fail('You can only change the status of your own listing.');
+    const {data,error}=await supabase.from('listings').update({sale_status:status,updated_at:new Date().toISOString()}).eq('id',listingStatusMatch[1]).select('id,sale_status').single();
+    return {data:{item:ensure(data,error)}};
   }
   const reportResolveMatch=path.match(/^\/api\/admin\/reports\/([^/]+)\/resolve$/);
   if(reportResolveMatch){
@@ -372,6 +396,24 @@ async function del(path:string){
   const user=await currentUser();
   const listingDelete=path.match(/^\/api\/listings\/([^/]+)$/);
   if(listingDelete){const {data:listing,error:lookupError}=await supabase.from('listings').select('id,vendor_id,vendor:vendors(owner_id)').eq('id',listingDelete[1]).single();if(lookupError)fail(lookupError.message);if((listing as any).vendor?.owner_id!==user.id)fail('You can only delete your own listing.');const {error}=await supabase.from('listings').delete().eq('id',listingDelete[1]);if(error)fail(error.message);return {data:{ok:true}};}
+  const groupDelete=path.match(/^\/api\/groups\/([^/]+)$/);
+  if(groupDelete){
+    const groupId=groupDelete[1];
+    const {data:group,error:groupError}=await supabase.from('community_groups').select('id,owner_id').eq('id',groupId).single();
+    if(groupError)fail(groupError.message);
+    if(group.owner_id!==user.id)fail('Only the group owner can delete this group.');
+    const {data:groupPosts,error:postsError}=await supabase.from('community_group_posts').select('id').eq('group_id',groupId);
+    if(postsError)fail(postsError.message);
+    const postIds=(groupPosts||[]).map((p:any)=>p.id);
+    if(postIds.length){const {error}=await supabase.from('community_group_post_reactions').delete().in('post_id',postIds);if(error)fail(error.message);}
+    const {error:deletePostsError}=await supabase.from('community_group_posts').delete().eq('group_id',groupId);
+    if(deletePostsError)fail(deletePostsError.message);
+    const {error:deleteMembersError}=await supabase.from('group_members').delete().eq('group_id',groupId);
+    if(deleteMembersError)fail(deleteMembersError.message);
+    const {error:deleteGroupError}=await supabase.from('community_groups').delete().eq('id',groupId).eq('owner_id',user.id);
+    if(deleteGroupError)fail(deleteGroupError.message);
+    return {data:{ok:true}};
+  }
   const groupPostDelete=path.match(/^\/api\/groups\/([^/]+)\/posts\/([^/]+)$/);
   if(groupPostDelete){const {error}=await supabase.from('community_group_posts').delete().eq('id',groupPostDelete[2]).eq('group_id',groupPostDelete[1]);if(error)fail(error.message);return {data:{ok:true}};}
   const groupMemberDelete=path.match(/^\/api\/groups\/([^/]+)\/members\/([^/]+)$/);
