@@ -349,6 +349,10 @@ export default function App() {
     setMemberPanel(kind);
     setMemberItems([]);
     try {
+      if (kind === 'messages' || kind === 'friends') {
+        const peopleResult = await api.get('/api/people');
+        setPeople(peopleResult.data?.items || []);
+      }
       const path = kind === 'messages' ? '/api/messages' : kind === 'friends' ? '/api/friends' : '/api/notifications';
       const result = await api.get(path);
       setMemberItems(result.data?.items || []);
@@ -374,7 +378,7 @@ export default function App() {
   };
   const sendMemberMessage = async () => {
     if (!recipientId.trim() || !memberText.trim()) {
-      setNotice('Enter the recipient member ID and a message.');
+      setNotice('Choose a member from the people list and write a message.');
       return;
     }
     setBusy(true);
@@ -454,10 +458,11 @@ export default function App() {
             const Icon = [
               Sparkles,
               ShoppingBag,
-              MessageCircle,
+              Heart,
               Users,
+              Store,
               BriefcaseBusiness,
-            ][index];
+            ][index] || Sparkles;
             return (
               <button
                 key={item}
@@ -520,9 +525,14 @@ export default function App() {
               </div>
               {memberPanel === 'messages' && (
                 <form className="member-compose" onSubmit={e => { e.preventDefault(); void sendMemberMessage(); }}>
-                  <label>Recipient member ID<input value={recipientId} onChange={e => setRecipientId(e.target.value)} placeholder="Paste the member ID" required /></label>
+                  <label>Find a member<input value={peopleQuery} onChange={e=>setPeopleQuery(e.target.value)} placeholder="Search by name or username" /></label>
+                  <div className="member-picker">
+                    {people.filter((person:any)=>person.id!==(user?.userId||user?.id)&&((person.display_name||person.full_name||person.username||'').toLowerCase().includes(peopleQuery.toLowerCase()))).slice(0,6).map((person:any)=><button type="button" key={person.id} className={'member-pick-option '+(recipientId===person.id?'selected':'')} onClick={()=>setRecipientId(person.id)}><span className="avatar">{(person.display_name||person.full_name||person.username||'M').slice(0,1).toUpperCase()}</span><span><b>{person.display_name||person.full_name||person.username||'Calabar member'}</b><small>@{person.username||'member'}</small></span><span>{recipientId===person.id?'Selected':'Choose'}</span></button>)}
+                    {!people.length&&<small>Loading members or no members found yet.</small>}
+                  </div>
+                  <p className="fine-print">{recipientId?'Recipient selected.':'Choose a person above to start a conversation.'}</p>
                   <label>Message<textarea value={memberText} onChange={e => setMemberText(e.target.value)} placeholder="Write a respectful message..." required rows={3} /></label>
-                  <button className="primary-btn" disabled={busy}>Send message <MessageCircle size={16} /></button>
+                  <button className="primary-btn" disabled={busy||!recipientId}>Send message <MessageCircle size={16} /></button>
                 </form>
               )}
               {memberPanel === 'friends' && (
@@ -536,8 +546,12 @@ export default function App() {
                     await openMemberPanel('friends');
                   } catch { setNotice('Could not send connection request.'); }
                 }}>
-                  <label>Member ID to connect with<input value={recipientId} onChange={e => setRecipientId(e.target.value)} placeholder="Paste the member ID" required /></label>
-                  <button className="primary-btn">Send connection request <Users size={16} /></button>
+                  <label>Find a member<input value={peopleQuery} onChange={e=>setPeopleQuery(e.target.value)} placeholder="Search by name or username" /></label>
+                  <div className="member-picker">
+                    {people.filter((person:any)=>person.id!==(user?.userId||user?.id)&&((person.display_name||person.full_name||person.username||'').toLowerCase().includes(peopleQuery.toLowerCase()))).slice(0,6).map((person:any)=><button type="button" key={person.id} className={'member-pick-option '+(recipientId===person.id?'selected':'')} onClick={()=>setRecipientId(person.id)}><span className="avatar">{(person.display_name||person.full_name||person.username||'M').slice(0,1).toUpperCase()}</span><span><b>{person.display_name||person.full_name||person.username||'Calabar member'}</b><small>@{person.username||'member'}</small></span><span>{recipientId===person.id?'Selected':'Choose'}</span></button>)}
+                    {!people.length&&<small>Loading members or no members found yet.</small>}
+                  </div>
+                  <button className="primary-btn" disabled={!recipientId}>Send connection request <Users size={16} /></button>
                 </form>
               )}
               <div className="member-list">
