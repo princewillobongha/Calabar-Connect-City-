@@ -301,9 +301,10 @@ async function post(path: string, body: any) {
   }
   if(path.startsWith('/api/groups/')&&path.endsWith('/join')){
     const id=path.split('/')[3];
-    const {data:existing,error:lookupError}=await supabase.from('group_members').select('group_id').eq('group_id',id).eq('user_id',user.id).maybeSingle();
+    const {data:existing,error:lookupError}=await supabase.from('group_members').select('group_id,status').eq('group_id',id).eq('user_id',user.id).maybeSingle();
     if(lookupError) fail(lookupError.message);
-    if(existing) return {data:{ok:true,alreadyJoined:true}};
+    if(existing?.status==='active') return {data:{ok:true,alreadyJoined:true}};
+    if(existing){const {error}=await supabase.from('group_members').update({status:'active',role:'member'}).eq('group_id',id).eq('user_id',user.id);if(error)fail(error.message);return {data:{ok:true,reactivated:true}};}
     const {error}=await supabase.from('group_members').insert({group_id:id,user_id:user.id,role:'member',status:'active'});
     if(error) fail(error.message);return {data:{ok:true}};
   }
