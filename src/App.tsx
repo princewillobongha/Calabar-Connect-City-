@@ -41,6 +41,8 @@ type Listing = {
   vendor_owner_id?: string;
   is_verified?: boolean;
   order_count?: number;
+  rating_average?: number;
+  rating_count?: number;
   available_until?: string | null;
   availability_note?: string;
 };
@@ -247,6 +249,8 @@ export default function App() {
   const deletePost = async (post:any) => {if(!window.confirm('Delete your post? This cannot be undone.'))return;try{await api.delete('/api/posts/'+post.id);setPosts(v=>v.filter(p=>p.id!==post.id));if(selectedPost?.id===post.id)setSelectedPost(null);setNotice('Post deleted.');}catch(e:any){setNotice(e?.message||'Could not delete this post.');}};
   const deleteListing = async (id:string) => {if(!window.confirm('Delete this listing? This cannot be undone.'))return;try{await api.delete('/api/listings/'+id);setListings(v=>v.filter(item=>item.id!==id));setSelectedListing(null);setNotice('Your listing has been deleted.');}catch(e:any){setNotice(e?.message||'Could not delete this listing.');}};
   const rateProfile = async (rating:number) => {if(!publicProfile||!requireMember('rate this member'))return;try{await api.post('/api/profile/'+publicProfile.id+'/rating',{rating});const r=await api.get('/api/profile/'+publicProfile.id);setPublicProfile(r.data?.item||publicProfile);setNotice('Your rating has been saved.');}catch(e:any){setNotice(e?.message||'Could not save your rating.');}};
+  const rateListingVendor = async (item:Listing,rating:number) => {if(!item.vendor_owner_id||!requireMember('rate this seller'))return;try{await api.post('/api/profile/'+item.vendor_owner_id+'/rating',{rating});const r=await api.get('/api/listings');setListings(r.data?.items||[]);setNotice('Your '+rating+'-star seller rating has been saved.');}catch(e:any){setNotice(e?.message||'Could not save your rating.');}};
+  const toggleGroupPostLike = async (post:any) => {if(!selectedGroup||!requireMember('Sign in to like group posts.'))return;try{await api.post('/api/groups/'+selectedGroup.id+'/posts/'+post.id+'/like',{});await openGroup(selectedGroup);}catch(e:any){setNotice(e?.message||'Could not update group post like.');}};
   const requestSubscription = (months:number,price:number) => {const name=user?.name||'Calabar Connect City member';const message='Hello Calabar Connect City Admin, my name is '+name+'. I would like to request the '+months+'-month verification subscription for ₦'+price.toLocaleString('en-NG')+'. Please share the next steps for payment and verification. Thank you.';window.open('https://wa.me/2349017751552?text='+encodeURIComponent(message),'_blank','noopener,noreferrer');setShowSubscriptions(false);};
   const toggleReshare = async (post:any) => {if(!requireMember('Sign in to reshare posts.'))return;try{if(post.shared_by_me)await api.delete('/api/posts/'+post.id+'/share');else await api.post('/api/posts/'+post.id+'/share',{});const r=await api.get('/api/posts');setPosts(r.data?.items||[]);setSelectedPost((p:any)=>p&&p.id===post.id?({...p,shared_by_me:!post.shared_by_me,share_count:Math.max(0,(p.share_count||0)+(post.shared_by_me?-1:1))}):p);setNotice(post.shared_by_me?'Reshare removed.':'Post reshared.');}catch(e:any){setNotice(e?.message||'Could not update reshare.');}};
   const toggleLike = async (post:any) => {if(!requireMember('Sign in to like posts.'))return;try{const r=await api.post('/api/posts/'+post.id+'/like',{});setPosts(v=>v.map(p=>p.id===post.id?{...p,liked_by_me:!!r.data?.liked,like_count:Math.max(0,(p.like_count||0)+(r.data?.liked?1:-1))}:p));if(selectedPost?.id===post.id)setSelectedPost((p:any)=>({...p,liked_by_me:!!r.data?.liked,like_count:Math.max(0,(p.like_count||0)+(r.data?.liked?1:-1))}));}catch(e:any){setNotice(e?.message||'Could not update like.');}};
@@ -427,10 +431,8 @@ export default function App() {
           ))}
           <button onClick={() => { setShowListingForm(true); setMenuOpen(false); }}>List a business or item <Plus size={16} /></button>
           <button onClick={() => {if(!user){setShowAuth(true);return;}setMenuOpen(false);void openPublicProfile(user?.userId||user?.id);}}>My profile <UserRound size={16}/></button>
-          <button onClick={() => { setActive("Marketplace"); setMenuOpen(false); }}>Saved items ({saved.length}) <Bookmark size={16}/></button>
           <button onClick={() => { setShowSubscriptions(true); setMenuOpen(false); }}>Verification subscription <BadgeCheck size={16}/></button>
           <button onClick={() => { setShowCart(true); setMenuOpen(false); }}>Shopping cart ({cart.length}) <ShoppingCart size={16}/></button>
-          <button onClick={() => { setShowPeople(true); setMenuOpen(false); }}>Find people <UserRound size={16}/></button>
           {(user?.email||'').toLowerCase()==='princewillobongha@gmail.com' && <button onClick={() => { void openAdmin(); setMenuOpen(false); }}>Admin verification <ShieldCheck size={16}/></button>}
         </div>
       )}
@@ -689,6 +691,7 @@ export default function App() {
                   </button>
                 </div>
                 <ListingGrid
+                  onRate={(item,rating)=>void rateListingVendor(item,rating)}
                   items={listings.slice(0, 4)}
                   saved={saved}
                   onSave={id => {
@@ -762,6 +765,7 @@ export default function App() {
               </div>
               {filtered.length ? (
                 <ListingGrid
+                  onRate={(item,rating)=>void rateListingVendor(item,rating)}
                   items={filtered}
                   saved={saved}
                   onSave={id => {
@@ -843,7 +847,7 @@ export default function App() {
                 <div className="group-profile-hero">{selectedGroup.avatar_url?<img src={selectedGroup.avatar_url} alt="Group"/>:<div className="group-avatar-fallback"><Users size={34}/></div>}<div><h1>{selectedGroup.name}</h1><p>{selectedGroup.description||'A community space for local members.'}</p><small>{selectedGroup.members||0} members</small></div>{selectedGroup.is_owner&&<label className="group-avatar-change">Change group photo<input type="file" accept="image/*" onChange={async e=>{const f=e.target.files?.[0];if(f)try{const avatar_url=await uploadImage(f);await api.post('/api/groups/'+selectedGroup.id+'/update',{avatar_url,description:selectedGroup.description});await openGroup(selectedGroup);setNotice('Group photo updated.');}catch(err:any){setNotice(err?.message||'Could not update group photo.');}}}/></label>}</div>
                 {!selectedGroup.is_member&&!selectedGroup.is_owner&&<button className="primary-btn" onClick={()=>void joinGroup(selectedGroup)}>Join group</button>}
                 {selectedGroup.is_member||selectedGroup.is_owner ? <div className="group-composer"><h3>Write a post</h3><textarea value={groupPostText} onChange={e=>setGroupPostText(e.target.value)} placeholder="What's on your mind? Share with the group…"/><div className="composer-actions"><label className="ghost-btn">Add photo<input type="file" accept="image/*" onChange={e=>setGroupPostImage(e.target.files?.[0]||null)}/></label>{groupPostImage&&<small>{groupPostImage.name}</small>}<button className="primary-btn" disabled={busy} onClick={()=>void createGroupPost()}>{busy?'Posting…':'Post to group'}</button></div></div>:<p className="muted">Join this group to read and publish group posts.</p>}
-                <div className="group-post-list">{(selectedGroup.posts||[]).map((gp:any)=><article className="feed-card group-post-card" key={gp.id}><button className="feed-avatar feed-avatar-button" onClick={()=>void openPublicProfile(gp.author_id)}>{gp.avatar_url?<img src={gp.avatar_url} alt=""/>:(gp.author||'M').slice(0,1)}</button><div><button className="post-author-link" onClick={()=>void openPublicProfile(gp.author_id)}>{gp.author} {gp.is_verified&&<BadgeCheck size={15} className="verified-badge"/>}</button><small>{new Date(gp.created_at).toLocaleString()}</small><p>{gp.text}</p>{gp.image_url&&<img className="post-photo" src={gp.image_url} alt="Group post"/>}{(selectedGroup.is_owner||gp.author_id===user?.userId||gp.author_id===user?.id)&&<button className="text-link danger-link" onClick={()=>void deleteGroupPost(gp)}>Delete post</button>}</div></article>)}{!(selectedGroup.posts||[]).length&&<div className="empty-state"><Users size={25}/><h3>No posts yet</h3><p>Be the first to post in this group.</p></div>}</div>
+                <div className="group-post-list">{(selectedGroup.posts||[]).map((gp:any)=><article className="feed-card group-post-card" key={gp.id}><button className="feed-avatar feed-avatar-button" onClick={()=>void openPublicProfile(gp.author_id)}>{gp.avatar_url?<img src={gp.avatar_url} alt=""/>:(gp.author||'M').slice(0,1)}</button><div><button className="post-author-link" onClick={()=>void openPublicProfile(gp.author_id)}>{gp.author} {gp.is_verified&&<BadgeCheck size={15} className="verified-badge"/>}</button><small>{new Date(gp.created_at).toLocaleString()}</small><p>{gp.text}</p>{gp.image_url&&<img className="post-photo" src={gp.image_url} alt="Group post"/>}<div className="post-actions"><button className={'text-link '+(gp.liked_by_me?'liked-action':'')} onClick={()=>void toggleGroupPostLike(gp)}><Heart size={16} fill={gp.liked_by_me?'currentColor':'none'}/> {gp.liked_by_me?'Liked':'Like'} <span>{gp.like_count||0}</span></button>{(selectedGroup.is_owner||gp.author_id===user?.userId||gp.author_id===user?.id)&&<button className="text-link danger-link" onClick={()=>void deleteGroupPost(gp)}>Delete post</button>}</div></div></article>)}{!(selectedGroup.posts||[]).length&&<div className="empty-state"><Users size={25}/><h3>No posts yet</h3><p>Be the first to post in this group.</p></div>}</div>
                 {selectedGroup.is_owner&&<div className="group-members-panel"><h3>Manage members</h3>{(selectedGroup.member_list||[]).map((m:any)=><div className="group-member-row" key={m.user_id}><button className="post-author-link" onClick={()=>void openPublicProfile(m.user_id)}>{m.profile?.display_name||m.profile?.username||'Member'} {m.role==='owner'?'· Admin':''}</button>{m.user_id!==user?.userId&&m.user_id!==user?.id&&<button className="text-link danger-link" onClick={()=>void removeGroupMember(m)}>Remove</button>}</div>)}</div>}
               </section>}
             </>
@@ -948,6 +952,7 @@ export default function App() {
                 </div>
               </div>
               <ListingGrid
+                  onRate={(item,rating)=>void rateListingVendor(item,rating)}
                 items={listings.filter(
                   l => l.category === 'Jobs' || l.kind === 'Job'
                 )}
@@ -1314,6 +1319,8 @@ function ListingGrid({
   onOpen,
   onContact,
   onOpenSeller,
+  onRate,
+  onDelete,
   currentUserId,
 }: {
   items: Listing[];
@@ -1322,6 +1329,7 @@ function ListingGrid({
   onOpen: (l: Listing) => void;
   onContact: (item: Listing) => void;
   onOpenSeller: (id: string) => void;
+  onRate: (item:Listing,rating:number) => void;
   currentUserId?: string;
   onDelete: (id:string) => void;
 }) {
@@ -1337,16 +1345,10 @@ function ListingGrid({
             {item.image ? <img src={item.image} alt={item.title}/> : <span className="listing-no-image">No photo uploaded</span>}
             <span className="listing-tag">{item.category}</span>
           </button>
-          <button
-            className={'save-btn ' + (saved.includes(item.id) ? 'saved' : '')}
-            aria-label="Save listing"
-            onClick={() => onSave(item.id)}
-          >
-            <Heart
-              size={17}
-              fill={saved.includes(item.id) ? 'currentColor' : 'none'}
-            />
-          </button>
+          <div className="listing-card-rating" aria-label={'Seller rating '+Number(item.rating_average||0).toFixed(1)+' out of 5'}>
+            {[1,2,3,4,5].map(n=><button key={n} type="button" className="listing-rating-star" title={'Rate seller '+n+' stars'} aria-label={'Rate '+item.vendor+' '+n+' stars'} onClick={e=>{e.stopPropagation();onRate(item,n);}}><Star size={13} fill={n<=Math.round(item.rating_average||0)?'currentColor':'none'}/></button>)}
+            <small>{Number(item.rating_average||0).toFixed(1)} ({item.rating_count||0})</small>
+          </div>
           <div className="listing-body">
             <div className="listing-vendor">
               <button className="vendor-avatar vendor-profile-button" onClick={()=>item.vendor_owner_id&&onOpenSeller(item.vendor_owner_id)} aria-label={'View '+item.vendor+' profile'}>{item.vendor.slice(0,1)}</button>
