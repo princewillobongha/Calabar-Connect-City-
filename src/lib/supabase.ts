@@ -347,7 +347,14 @@ async function post(path: string, body: any) {
   if(path==='/api/friends/request'){
     const to=String(body.to_id||'').trim(); if(!to||to===user.id) fail('Choose another member.');
     const {data:existing,error:ee}=await supabase.from('friend_requests').select('*').or('and(sender_id.eq.'+user.id+',receiver_id.eq.'+to+'),and(sender_id.eq.'+to+',receiver_id.eq.'+user.id+')').maybeSingle();
-    if(ee) fail(ee.message);if(existing)return {data:{item:existing}};
+    if(ee) fail(ee.message);
+    if(existing&&existing.status==='declined'){
+      const {data,error}=await supabase.from('friend_requests').update({sender_id:user.id,receiver_id:to,status:'pending',updated_at:new Date().toISOString()}).eq('id',existing.id).select('*').single();
+      const req=ensure(data,error);
+      await supabase.from('notifications').insert({user_id:to,actor_id:user.id,kind:'friend_request',title:'Connection request',body:'Someone wants to connect with you.'});
+      return {data:{item:{id:req.id,from_id:req.sender_id,to_id:req.receiver_id,status:req.status,created_at:req.created_at}}};
+    }
+    if(existing)return {data:{item:existing}};
     const {data,error}=await supabase.from('friend_requests').insert({sender_id:user.id,receiver_id:to}).select('*').single();
     const req=ensure(data,error);
     await supabase.from('notifications').insert({user_id:to,actor_id:user.id,kind:'friend_request',title:'Connection request',body:'Someone wants to connect with you.'});
