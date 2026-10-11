@@ -182,8 +182,8 @@ export default function App() {
       listings.filter(item => {
         const matchesCategory =
           category === 'All' ||
-          String(item.category || '').toLowerCase().includes(category.toLowerCase()) ||
-          String(item.kind || '').toLowerCase().includes(category.toLowerCase());
+          item.category.toLowerCase().includes(category.toLowerCase()) ||
+          item.kind.toLowerCase().includes(category.toLowerCase());
         const text = (
           item.title +
           ' ' +
