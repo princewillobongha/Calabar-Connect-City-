@@ -1995,3 +1995,22 @@ select:focus-visible {
 }
 
 .sold-status-inline { display:inline-flex; align-items:center; margin:0 0 8px; padding:6px 10px; border-radius:6px; background:#b4232d; color:#fff; font-size:11px; font-weight:900; letter-spacing:.1em; }
+
+
+/* Real Calabar business directory */
+.business-directory-page { min-height:60vh; }
+.business-directory-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:18px; }
+.business-directory-card { overflow:hidden; border:1px solid #e5eae2; border-radius:16px; background:#fff; box-shadow:0 4px 18px rgba(37,63,44,.04); }
+.business-directory-image { height:155px; position:relative; display:grid; place-items:center; background:linear-gradient(135deg,#e5efe2,#f7efe3); color:#42634a; overflow:hidden; }
+.business-directory-image img { width:100%; height:100%; object-fit:cover; }
+.business-directory-image > span { display:grid; place-items:center; width:58px; height:58px; border-radius:18px; background:#ffffffc9; }
+.business-directory-image small { position:absolute; left:11px; bottom:11px; padding:6px 8px; border-radius:6px; background:#fffffff0; color:#355840; font-size:10px; font-weight:800; }
+.business-directory-body { padding:15px; }
+.business-directory-title { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.business-directory-title h3 { margin:0; color:#274432; font-size:16px; }
+.business-directory-body > p { color:#667468; font-size:13px; line-height:1.5; min-height:38px; margin:9px 0; }
+.business-directory-meta { display:flex; align-items:center; gap:7px; margin:7px 0; color:#647366; font-size:12px; }
+.business-directory-actions { display:flex; gap:8px; margin-top:14px; }
+.business-directory-actions button { flex:1; padding:9px 10px; font-size:12px; }
+@media (max-width: 980px) { .business-directory-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media (max-width: 600px) { .business-directory-grid { grid-template-columns:1fr; } .business-directory-image { height:180px; } }
