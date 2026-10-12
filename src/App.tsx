@@ -434,6 +434,17 @@ export default function App() {
       window.setTimeout(()=>void openPost(post),40);
       return;
     }
+    if (target.startsWith('report://')) {
+      const reportId=target.slice('report://'.length);
+      try {
+        const admin=(user?.email||'').toLowerCase()==='princewillobongha@gmail.com';
+        const res=await api.get(admin?'/api/admin/reports':'/api/reports/mine');
+        const report=(res.data?.items||[]).find((r:any)=>r.id===reportId);
+        if(report){if(admin){setAdminReports(res.data.items||[]);setShowAdmin(true);}await openReportChat(report);return;}
+        setNotice('This report conversation could not be found.');
+      } catch(e:any){setNotice(e?.message||'Could not open the report conversation.');}
+      return;
+    }
     if (target.startsWith('group-post://')) {
       const [groupId,postId]=target.slice('group-post://'.length).split('/');
       try {
