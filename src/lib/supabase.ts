@@ -309,8 +309,14 @@ async function post(path: string, body: any) {
   }
   if(path.startsWith('/api/comments/')){
     const postId=path.split('/')[3];
+    const {data:post,error:postError}=await supabase.from('community_posts').select('author_id').eq('id',postId).maybeSingle();
+    if(postError) fail(postError.message);
     const {data,error}=await supabase.from('community_comments').insert({post_id:postId,author_id:user.id,text:String(body.text||'').trim(),image_url:body.image_url||null}).select('*, author_profile:profiles!community_comments_author_id_fkey(username,display_name,avatar_url,is_verified)').single();
-    return {data:{item:ensure(data,error)}};
+    const comment=ensure(data,error);
+    if(post?.author_id && post.author_id!==user.id){
+      await supabase.from('notifications').insert({user_id:post.author_id,actor_id:user.id,kind:'post_comment',title:'New comment on your post',body:profileName(user)+' commented on your community post.'});
+    }
+    return {data:{item:comment}};
   }
   const reactionMatch=path.match(/^\/api\/posts\/([^/]+)\/like$/);
   if(reactionMatch){
@@ -318,7 +324,12 @@ async function post(path: string, body: any) {
     const {data:existing,error:ee}=await supabase.from('community_post_reactions').select('*').eq('post_id',postId).eq('user_id',user.id).maybeSingle();
     if(ee) fail(ee.message);
     if(existing){const {error}=await supabase.from('community_post_reactions').delete().eq('post_id',postId).eq('user_id',user.id);if(error)fail(error.message);return {data:{liked:false}};}
-    const {error}=await supabase.from('community_post_reactions').insert({post_id:postId,user_id:user.id});if(error)fail(error.message);return {data:{liked:true}};
+    const {error}=await supabase.from('community_post_reactions').insert({post_id:postId,user_id:user.id});if(error)fail(error.message);
+    const {data:post}=await supabase.from('community_posts').select('author_id').eq('id',postId).maybeSingle();
+    if(post?.author_id && post.author_id!==user.id){
+      await supabase.from('notifications').insert({user_id:post.author_id,actor_id:user.id,kind:'post_like',title:'Someone liked your post',body:profileName(user)+' liked your community post.'});
+    }
+    return {data:{liked:true}};
   }
   if(path.startsWith('/api/posts/')&&path.endsWith('/share')){
     const postId=path.split('/')[3];
