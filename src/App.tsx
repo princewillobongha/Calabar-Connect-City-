@@ -83,6 +83,7 @@ function money(value: string) {
 }
 export default function App() {
   const [user, setUser] = useState<any>(null);
+  const isAdmin = (user?.email || '').toLowerCase() === 'princewillobongha@gmail.com';
   const [, setLoading] = useState(true);
   const [listings, setListings] = useState<Listing[]>([]);
   const [businesses, setBusinesses] = useState<any[]>([]);
@@ -743,7 +744,7 @@ export default function App() {
                   onOpen={setSelectedListing}
                   onContact={contactSeller}
                   currentUserId={user?.userId||user?.id}
-                  isAdmin={(user?.email||'').toLowerCase()==='princewillobongha@gmail.com'}
+                  isAdmin={isAdmin}
                   onDelete={deleteListing}
                   onOpenSeller={id=>void openPublicProfile(id)}
                 />
