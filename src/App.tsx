@@ -47,6 +47,8 @@ type Listing = {
   vendor_owner_id?: string;
   is_verified?: boolean;
   order_count?: number;
+  view_count?: number;
+  pinned_at?: string | null;
   rating_average?: number;
   rating_count?: number;
   available_until?: string | null;
@@ -75,6 +77,8 @@ type Post = {
   like_count?: number;
   liked_by_me?: boolean;
   share_count?: number;
+  view_count?: number;
+  pinned_at?: string | null;
   shared_by_me?: boolean;
   comment_count?: number;
 };
