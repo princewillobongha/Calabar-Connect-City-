@@ -1522,9 +1522,20 @@ select:focus-visible {
     border: 1px solid #e6e9e2;
     border-radius: 12px;
     box-shadow: 0 16px 45px #1b2a1a20;
-    width: 230px;
+    width: min(280px, calc(100vw - 24px));
+    max-height: calc(100dvh - 86px - env(safe-area-inset-bottom));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
     padding: 9px;
     flex-direction: column;
+  }
+  .mobile-panel button {
+    flex: 0 0 auto;
+    min-height: 42px;
+  }
+  .mobile-panel button.danger-link {
+    color: #b4232d;
   }
   .mobile-panel button {
     display: flex;
