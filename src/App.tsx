@@ -223,7 +223,7 @@ export default function App() {
           'Repairs & Professional Services': 'service',
           'Jobs & Opportunities': 'job',
         } as Record<string, string>)[category] || category.toLowerCase();
-        const itemCategory = (String(item.category || '') + ' ' + String(item.kind || '')).toLowerCase();
+        const itemCategory = (String(item.category || '') + ' ' + String(item.kind || '') + ' ' + String(item.title || '') + ' ' + String(item.description || '')).toLowerCase();
         const matchesCategory = category === 'All' ||
           itemCategory.includes(categoryNeedle) ||
           (category === 'Electronics & Gadgets' && /electronics|electronic|gadget|phone|computer|laptop/.test(itemCategory)) ||
