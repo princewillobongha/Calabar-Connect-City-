@@ -78,8 +78,10 @@ async function get(path: string) {
     if(listingError) fail(listingError.message);
     if((listing as any).sale_status==='sold') fail('This item has been marked SOLD by the seller.');
     const ownerId=(listing as any).vendor?.owner_id;
-    const {data:profile,error:profileError}=ownerId?await supabase.from('profiles').select('whatsapp_url,display_name,username').eq('id',ownerId).maybeSingle():{data:null,error:null};
+    const {data:profile,error:profileError}=ownerId?await supabase.from('profiles').select('whatsapp_url,display_name,username,is_verified,verified_until').eq('id',ownerId).maybeSingle():{data:null,error:null};
     if(profileError) fail(profileError.message);
+    const sellerVerified=!!profile?.is_verified&&(!profile?.verified_until||new Date(profile.verified_until).getTime()>Date.now());
+    if(!sellerVerified) fail('You cannot contact this seller yet because this seller is not verified. Please choose a verified seller.');
     const raw=String(profile?.whatsapp_url||(listing as any).vendor?.whatsapp_url||'').trim();
     const url=normalizeWhatsApp(raw);
     if(!url) fail('This seller has not added a valid WhatsApp contact yet. Ask them to add it under Edit profile.');
@@ -225,7 +227,7 @@ async function post(path: string, body: any) {
       if(error) fail(error.message);
     }
     const numeric=Number(String(body.price||'').replace(/[^0-9.]/g,''))||0;
-    const {data,error}=await supabase.from('listings').insert({vendor_id:vendor.id,title:body.title,description:body.description,price_ngn:numeric,image_urls:Array.isArray(body.image_urls)?body.image_urls:(body.image?[body.image]:[]),category:body.category||'Product',available_until:body.available_until||null,availability_note:String(body.availability_note||'').trim()||null}).select('*, vendor:vendors(*)').single();
+    const {data,error}=await supabase.from('listings').insert({vendor_id:vendor.id,title:body.title,description:body.description,price_ngn:numeric,image_urls:Array.isArray(body.image_urls)?body.image_urls:(body.image?[body.image]:[]),category:body.category||'Product',available_until:null,availability_note:null}).select('*, vendor:vendors(*)').single();
     const created=ensure(data,error); const {data:ownerProfile}=await supabase.from('profiles').select('id,username,display_name,is_verified,verified_until').eq('id',user.id).maybeSingle();
     return {data:{item:asItem({...created,owner_profile:ownerProfile})}};
   }
