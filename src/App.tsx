@@ -387,6 +387,48 @@ export default function App() {
       setBusy(false);
     }
   };
+  const markNotificationRead = async (item:any) => {
+    if (!item?.id) return;
+    try {
+      if (!item.read) await api.post('/api/notifications/'+item.id+'/read', {});
+      setMemberItems(items=>items.map((n:any)=>n.id===item.id?{...n,read:true}:n));
+      if (!item.read) setUnreadNotifications(value=>Math.max(0,value-1));
+    } catch { setNotice('Could not update this notification. Please try again.'); }
+  };
+  const openNotification = async (item:any) => {
+    await markNotificationRead(item);
+    setMemberPanel(null);
+    const target=String(item?.target_url||'');
+    if (target.startsWith('profile://')) { await openPublicProfile(target.slice('profile://'.length)); return; }
+    if (target.startsWith('listing://')) {
+      const id=target.slice('listing://'.length);
+      let listing=listings.find((x:any)=>x.id===id);
+      if (!listing) { try { const r=await api.get('/api/listings'); const items=r.data?.items||[]; setListings(items); listing=items.find((x:any)=>x.id===id); } catch {} }
+      if (!listing) { setNotice('This listing may have been removed.'); return; }
+      setActive('Marketplace');
+      window.setTimeout(()=>setSelectedListing(listing as Listing),40);
+      return;
+    }
+    if (target.startsWith('post://')) {
+      const id=target.slice('post://'.length);
+      let post=posts.find((x:any)=>x.id===id);
+      if (!post) { try { const r=await api.get('/api/posts'); const items=r.data?.items||[]; setPosts(items); post=items.find((x:any)=>x.id===id); } catch {} }
+      if (!post) { setNotice('This post may have been removed.'); return; }
+      setActive('Community');
+      window.setTimeout(()=>void openPost(post),40);
+      return;
+    }
+    if (target.startsWith('group-post://')) {
+      const [groupId,postId]=target.slice('group-post://'.length).split('/');
+      try {
+        const r=await api.get('/api/groups');
+        const group=(r.data?.items||[]).find((g:any)=>g.id===groupId);
+        if (!group) { setNotice('This group may no longer be available.'); return; }
+        await openGroup(group);
+        window.setTimeout(()=>document.getElementById('group-post-'+postId)?.scrollIntoView({behavior:'smooth',block:'center'}),120);
+      } catch { setNotice('Could not open this group post. Please try again.'); }
+    }
+  };
   const openMemberPanel = async (kind: 'friends' | 'notifications') => {
     if (!requireMember('Sign in to use member tools.')) return;
     setShowAuth(false); setShowProfile(false); setShowListingForm(false); setShowPostForm(false);
@@ -574,7 +616,7 @@ export default function App() {
               )}
               <div className="member-list">
                 {memberItems.length ? memberItems.map((item, i) => (
-                  <article className={'member-item '+(memberPanel==='notifications'&&!item.read?'notification-unread':'')} key={item.id || i} onClick={()=>{if(memberPanel==='notifications'&&!item.read&&item.id){void api.post('/api/notifications/'+item.id+'/read',{}).then(()=>{setMemberItems(items=>items.map((n:any)=>n.id===item.id?{...n,read:true}:n));setUnreadNotifications(v=>Math.max(0,v-1));}).catch(()=>{});}}}>
+                  <article className={'member-item '+(memberPanel==='notifications'&&!item.read?'notification-unread':'')} key={item.id || i} role={memberPanel==='notifications'?'button':undefined} tabIndex={memberPanel==='notifications'?0:undefined} onKeyDown={e=>{if(memberPanel==='notifications'&&(e.key==='Enter'||e.key===' ')){e.preventDefault();void openNotification(item);}}} onClick={()=>{if(memberPanel==='notifications')void openNotification(item);}}>
                     <b>{item.title || item.from_name || item.sender_name || item.kind || 'Community update'}</b>
                     <p>{item.body || item.text || (item.status ? 'Status: ' + item.status : '')}</p>
                     <small>{item.created_at ? new Date(item.created_at).toLocaleString() : ''}{item.sender_id ? ' · Member ID: ' + (item.sender_id === user?.userId ? item.recipient_id : item.sender_id) : ''}</small>
@@ -584,7 +626,7 @@ export default function App() {
                         <button className="ghost-btn" onClick={async () => { await api.post('/api/friends/' + item.id + '/respond', { accept: false }); await openMemberPanel('friends'); }}>Decline</button>
                       </div>
                     )}
-                    {memberPanel === 'notifications' && !item.read && item.id && <button className="text-link" onClick={async (e) => { e.stopPropagation(); await api.post('/api/notifications/' + item.id + '/read', {}); await openMemberPanel('notifications'); }}>Mark as read</button>}
+                    {memberPanel === 'notifications' && !item.read && item.id && <button className="text-link" onClick={async (e) => { e.stopPropagation(); await markNotificationRead(item); }}>Mark as read</button>}
                   </article>
                 )) : (
                   <div className="empty-state"><Bell size={26} /><h3>{memberPanel==='notifications'?'No notifications yet':'No connection requests yet'}</h3><p>{memberPanel==='notifications'?'You’re all caught up. New listings, community posts, group activity and new followers will appear here.':'Connection requests will appear here when members want to connect.'}</p></div>
