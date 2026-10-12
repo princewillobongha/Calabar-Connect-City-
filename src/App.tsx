@@ -1440,6 +1440,7 @@ export default function App() {
             >
               <MessageCircle size={17} /> {selectedListing.sale_status==='sold'?'Item sold':'Contact seller'}
             </button>
+            <button className="ghost-btn full-btn" onClick={()=>{setReportTarget({type:'marketplace_listing',id:selectedListing.id,label:'marketplace listing'});setReportText('');setSelectedListing(null);}}>Report listing <ShieldCheck size={16}/></button>
             <small className="fine-print">
               Always verify details with the seller before making payment.
             </small>
