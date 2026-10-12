@@ -2057,3 +2057,9 @@ select:focus-visible {
 .modal-backdrop { z-index:10000; }
 .modal-backdrop .modal { position:relative; z-index:10001; }
 .member-panel { position:relative; z-index:1; }
+
+@media(max-width:620px) {
+ .listing-actions { width:auto !important; flex:1 1 auto; min-width:0; }
+ .listing-actions .listing-status-button { flex:1 1 auto; }
+ .listing-bottom > b { font-size:15px; }
+}
