@@ -2039,3 +2039,21 @@ select:focus-visible {
 .notification-label { font-size:12px; font-weight:750; }
 .notification-count { position:absolute; top:-6px; right:-5px; z-index:2; }
 @media(max-width:640px){ .icon-btn.notification { padding:0 9px; } .notification-label { display:none; } }
+
+/* Keep listing-owner actions distinct and reachable on small screens. */
+.listing-actions { display:flex; align-items:center; gap:8px; flex-wrap:nowrap; min-width:0; }
+.listing-actions .listing-status-button { flex:1 1 auto; min-width:104px; min-height:38px; order:1; }
+.listing-actions .listing-delete-button { position:static !important; flex:0 0 38px; width:38px; min-width:38px; height:38px; margin:0 !important; order:2; }
+.listing-actions .listing-contact-button { flex:0 0 38px; width:38px; min-width:38px; height:38px; }
+.bottom-notification-count { display:inline-flex; align-items:center; justify-content:center; min-width:17px; height:17px; margin-left:3px; padding:0 4px; border-radius:99px; background:#b4232d; color:#fff; font-size:10px; font-style:normal; font-weight:800; }
+@media(max-width:620px) {
+ .listing-bottom { display:flex; align-items:flex-start; gap:8px; }
+ .listing-bottom > b { flex:0 0 auto; }
+ .listing-actions { flex:1 1 auto; justify-content:flex-end; gap:6px; }
+ .listing-actions .listing-status-button { min-width:95px; padding:7px 8px !important; }
+ .listing-actions .listing-delete-button { flex-basis:36px; width:36px; min-width:36px; height:36px; }
+}
+/* Any newly opened modal must sit above stale overlays during transitions. */
+.modal-backdrop { z-index:10000; }
+.modal-backdrop .modal { position:relative; z-index:10001; }
+.member-panel { position:relative; z-index:1; }
