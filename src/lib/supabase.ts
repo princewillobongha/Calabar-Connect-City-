@@ -190,8 +190,29 @@ async function get(path: string) {
     return {data:{items:ensure(data,error).map((x:any)=>({id:x.id,from_id:x.sender_id,to_id:x.receiver_id,from_name:x.sender?.display_name||x.sender?.username||'Member',to_name:x.receiver?.display_name||x.receiver?.username||'Member',status:x.status,created_at:x.created_at}))}};
   }
   if (path === '/api/notifications') {
-    const {data,error}=await supabase.from('notifications').select('*').eq('user_id',user.id).order('created_at',{ascending:false}).limit(100);
-    return {data:{items:ensure(data,error).map((n:any)=>({...n,read:!!n.read_at}))}};
+    const {data,error}=await supabase.from('notifications').select('*').eq('user_id',user.id).order('created_at',{ascending:false}).limit(150);
+    const rows=ensure(data,error);
+    const actorIds=[...new Set(rows.filter((n:any)=>n.actor_id).map((n:any)=>n.actor_id))];
+    const {data:actors,error:actorError}=actorIds.length?await supabase.from('profiles').select('id,display_name,username').in('id',actorIds):{data:[],error:null};
+    if(actorError) fail(actorError.message);
+    const actorMap=new Map((actors||[]).map((p:any)=>[p.id,p]));
+    const normalized=rows.map((n:any)=>{
+      const isFollow=['follow','new_follower'].includes(String(n.kind||'')) || /follower/i.test(String(n.title||''));
+      if(!isFollow) return {...n,read:!!n.read_at};
+      const actor:any=actorMap.get(n.actor_id);
+      const name=actor?.display_name||actor?.username||'A member';
+      return {...n,kind:'new_follower',title:'You have a new follower',body:name+' started following you.',target_url:n.actor_id?'profile://'+n.actor_id:n.target_url,read:!!n.read_at};
+    });
+    const deduped:any[]=[];
+    for(const n of normalized){
+      if(n.kind==='new_follower'){
+        const time=Date.parse(n.created_at||'');
+        const duplicate=deduped.some((x:any)=>x.kind==='new_follower'&&x.actor_id===n.actor_id&&Math.abs(time-Date.parse(x.created_at||''))<=5000);
+        if(duplicate) continue;
+      }
+      deduped.push(n);
+    }
+    return {data:{items:deduped.slice(0,100)}};
   }
   if (path === '/api/admin/profiles') {
     if ((user.email||'').toLowerCase() !== 'princewillobongha@gmail.com') fail('Admin access required.');
@@ -254,11 +275,13 @@ async function post(path: string, body: any) {
     if(reportError)fail(reportError.message);
     if(!report.target_id)fail('This report has no linked content to remove.');
     let removeError:any=null;
-    if(report.target_type==='community_post'){const r=await supabase.from('community_posts').delete().eq('id',report.target_id);removeError=r.error;}
-    else if(report.target_type==='group_post'){const r=await supabase.from('community_group_posts').delete().eq('id',report.target_id);removeError=r.error;}
-    else if(report.target_type==='marketplace_listing'){const r=await supabase.from('listings').delete().eq('id',report.target_id);removeError=r.error;}
+    let removed:any[]|null=null;
+    if(report.target_type==='community_post'){const r=await supabase.from('community_posts').delete().eq('id',report.target_id).select('id');removeError=r.error;removed=r.data;}
+    else if(report.target_type==='group_post'){const r=await supabase.from('community_group_posts').delete().eq('id',report.target_id).select('id');removeError=r.error;removed=r.data;}
+    else if(report.target_type==='marketplace_listing'){const r=await supabase.from('listings').delete().eq('id',report.target_id).select('id');removeError=r.error;removed=r.data;}
     else fail('This report type cannot be removed automatically. Review the profile report manually.');
     if(removeError)fail(removeError.message);
+    if(!removed?.length)fail('No reported content was removed. It may already be deleted or access was blocked.');
     const {error:statusError}=await supabase.from('moderation_reports').update({status:'resolved',reviewed_at:new Date().toISOString()}).eq('id',report.id);
     if(statusError)fail(statusError.message);
     return {data:{ok:true}};
@@ -450,6 +473,18 @@ export const auth = {
 };
 async function del(path:string){
   const user=await currentUser();
+  if(path==='/api/notifications/clear-all'){
+    const {data,error}=await supabase.from('notifications').delete().eq('user_id',user.id).select('id');
+    if(error) fail(error.message);
+    return {data:{ok:true,deleted:data?.length||0}};
+  }
+  const notificationDelete=path.match(/^\/api\/notifications\/([^/]+)$/);
+  if(notificationDelete){
+    const {data,error}=await supabase.from('notifications').delete().eq('id',notificationDelete[1]).eq('user_id',user.id).select('id').maybeSingle();
+    if(error) fail(error.message);
+    if(!data) fail('This notification was not found or has already been deleted.');
+    return {data:{ok:true}};
+  }
   if(/^\/api\/posts\/[^/]+\/share$/.test(path)) fail('Resharing is disabled on Calabar Connect City.');
   const listingDelete=path.match(/^\/api\/listings\/([^/]+)$/);
   if(listingDelete){const {data:listing,error:lookupError}=await supabase.from('listings').select('id,vendor_id,vendor:vendors(owner_id)').eq('id',listingDelete[1]).single();if(lookupError)fail(lookupError.message);if((user.email||'').toLowerCase()!=='princewillobongha@gmail.com'&&(listing as any).vendor?.owner_id!==user.id)fail('You can only delete your own listing.');const {error}=await supabase.from('listings').delete().eq('id',listingDelete[1]);if(error)fail(error.message);return {data:{ok:true}};}
