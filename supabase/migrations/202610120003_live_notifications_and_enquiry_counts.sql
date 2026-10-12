@@ -23,6 +23,9 @@ returns trigger language plpgsql security definer set search_path = public, pg_t
 as $$
 declare v_name text;
 begin
+  if new.category = 'Repost' then
+    return new;
+  end if;
   select coalesce(display_name, username, 'A member') into v_name from public.profiles where id = new.author_id;
   insert into public.notifications (user_id, actor_id, kind, title, body, target_url)
   select p.id, new.author_id, 'community_post', 'New community post',
