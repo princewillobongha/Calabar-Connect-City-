@@ -2063,3 +2063,13 @@ select:focus-visible {
  .listing-actions .listing-status-button { flex:1 1 auto; }
  .listing-bottom > b { font-size:15px; }
 }
+
+/* Full-screen, Facebook-style member profile on mobile and desktop */
+.public-profile-modal { width:min(960px,96vw) !important; max-width:960px !important; max-height:92dvh !important; overflow-y:auto !important; }
+@media(max-width:640px){ .public-profile-modal { width:100vw !important; max-width:none !important; height:100dvh !important; max-height:100dvh !important; border-radius:0 !important; padding:22px 16px 100px !important; } }
+.profile-listing-item { display:grid; grid-template-columns:96px minmax(0,1fr); gap:12px; padding:14px 0; border-bottom:1px solid #e5e9e1; cursor:pointer; }
+.profile-listing-item img { width:96px; height:96px; border-radius:12px; object-fit:cover; }
+.profile-listing-item h4 { margin:4px 0; }
+.brand.brand-logo-only { width:150px; min-width:150px; height:76px; overflow:hidden; display:flex; align-items:center; }
+.brand.brand-logo-only img { width:100%; height:72px; object-fit:contain; }
+@media(max-width:640px){ .brand.brand-logo-only { width:112px; min-width:112px; height:66px; } .brand.brand-logo-only img { height:62px; } }
