@@ -424,10 +424,13 @@ export default function App() {
       const [groupId,postId]=target.slice('group-post://'.length).split('/');
       try {
         const r=await api.get('/api/groups');
-        const group=(r.data?.items||[]).find((g:any)=>g.id===groupId);
+        let group=(r.data?.items||[]).find((g:any)=>g.id===groupId);
+        if (!group) {
+          try { const detail=await api.get('/api/groups/'+groupId); group=detail.data?.item; } catch {}
+        }
         if (!group) { setNotice('This group may no longer be available.'); return; }
         await openGroup(group);
-        window.setTimeout(()=>document.getElementById('group-post-'+postId)?.scrollIntoView({behavior:'smooth',block:'center'}),120);
+        window.setTimeout(()=>document.getElementById('group-post-'+postId)?.scrollIntoView({behavior:'smooth',block:'center'}),180);
       } catch { setNotice('Could not open this group post. Please try again.'); }
     }
   };
