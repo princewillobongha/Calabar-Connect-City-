@@ -2288,3 +2288,15 @@ html.dark-mode .admin-announcements > p { color:#b2c1b5; }
 .menu-announcement-link{font-weight:800!important;color:#2e5a37!important;background:#f0f7ee!important;border:1px solid #d7e7d4!important}
 html.dark-mode .marketplace-search-form,html.dark-mode .marketplace-seller-results,html.dark-mode .marketplace-seller-result,html.dark-mode .admin-management-section,html.dark-mode .admin-stat-card{background:#17231a;color:#e6eee6;border-color:#344738}html.dark-mode .marketplace-seller-results h3,html.dark-mode .admin-stat-card strong,html.dark-mode .admin-section-heading h3{color:#d7ead6}html.dark-mode .admin-stat-card span,html.dark-mode .admin-stat-card small,html.dark-mode .admin-section-heading p,html.dark-mode .marketplace-seller-results p{color:#b0c0b0}
 @media(max-width:720px){.admin-stats-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.admin-dashboard-heading{flex-direction:column}.admin-dashboard-heading>.ghost-btn{width:100%}.admin-listing-row{align-items:flex-start;flex-wrap:wrap}.admin-listing-actions{width:100%;padding-left:64px}.marketplace-search-form{gap:6px;padding-left:10px}.marketplace-search-form input{font-size:13px}.marketplace-search-form .primary-btn{padding:9px 11px}.admin-management-section{padding:12px}}
+
+/* Accessible full-size image viewer for member photos and marketplace images */
+.public-profile-avatar-button{display:block;width:max-content;max-width:100%;padding:0;margin:0 auto 12px;border:0;background:transparent;border-radius:50%;cursor:zoom-in}
+.public-profile-avatar-button:focus-visible,.detail-image-button:focus-visible,.detail-gallery-button:focus-visible{outline:3px solid #77a77b;outline-offset:3px}
+.detail-image-button{display:block;width:100%;padding:0;border:0;background:transparent;border-radius:14px;overflow:hidden;cursor:zoom-in}
+.detail-image-button .detail-image{display:block;width:100%;cursor:zoom-in}
+.detail-gallery-button{padding:0;border:0;background:transparent;border-radius:10px;overflow:hidden;cursor:zoom-in}
+.detail-gallery-button .detail-gallery-image{display:block;width:100%;height:100%;object-fit:cover}
+.image-preview-backdrop{position:fixed;inset:0;z-index:20000;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(7,12,9,.92);cursor:zoom-out}
+.image-preview-full{display:block;max-width:min(100%,1100px);max-height:calc(100dvh - 48px);width:auto;height:auto;object-fit:contain;border-radius:8px;box-shadow:0 18px 60px rgba(0,0,0,.35);cursor:default}
+.image-preview-close{position:absolute;top:max(14px,env(safe-area-inset-top));right:max(14px,env(safe-area-inset-right));width:44px;height:44px;display:grid;place-items:center;border:1px solid rgba(255,255,255,.35);border-radius:50%;background:rgba(255,255,255,.12);color:white;cursor:pointer}
+@media(max-width:600px){.image-preview-backdrop{padding:12px}.image-preview-full{max-width:100%;max-height:calc(100dvh - 24px)}}
