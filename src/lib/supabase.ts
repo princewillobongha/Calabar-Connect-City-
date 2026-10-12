@@ -247,7 +247,7 @@ async function post(path: string, body: any) {
   const reportResolveMatch=path.match(/^\/api\/admin\/reports\/([^/]+)\/resolve$/);
   if(reportResolveMatch){
     if((user.email||'').toLowerCase()!=='princewillobongha@gmail.com') fail('Admin access required.');
-    const {data,error}=await supabase.from('moderation_reports').update({status:'reviewed',reviewed_at:new Date().toISOString()}).eq('id',reportResolveMatch[1]).select('*').single();
+    const {data,error}=await supabase.from('moderation_reports').update({status:'resolved',reviewed_at:new Date().toISOString()}).eq('id',reportResolveMatch[1]).select('*').single();
     return {data:{item:ensure(data,error)}};
   }
   const ratingMatch=path.match(/^\/api\/profile\/([^/]+)\/rating$/);
