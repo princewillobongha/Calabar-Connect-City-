@@ -2121,3 +2121,32 @@ select:focus-visible {
   .topbar { gap: 10px; padding-left: 14px; padding-right: 12px; }
   .top-actions { gap: 4px; }
 }
+
+
+/* Accessible dark theme, controlled from the menu. */
+html.dark-mode body { background: #101713; color: #e5eee7; color-scheme: dark; }
+html.dark-mode .topbar, html.dark-mode .mobile-panel, html.dark-mode .member-panel,
+html.dark-mode .member-item, html.dark-mode .listing-card, html.dark-mode .category-card,
+html.dark-mode .modal, html.dark-mode .form-modal, html.dark-mode .auth-modal,
+html.dark-mode .public-profile-modal, html.dark-mode .cart-panel, html.dark-mode .search-panel {
+  background-color: #18221c; color: #e5eee7; border-color: #304136;
+}
+html.dark-mode .hero { background: #202d24; }
+html.dark-mode .hero h1, html.dark-mode .page-title h1, html.dark-mode .section-heading h2,
+html.dark-mode .category-card > b, html.dark-mode .listing-title, html.dark-mode .listing-bottom > b,
+html.dark-mode .right-heading h3, html.dark-mode .welcome-card h3, html.dark-mode .post-detail-text { color: #e5eee7; }
+html.dark-mode .hero-copy > p, html.dark-mode .listing-body > p, html.dark-mode .listing-location,
+html.dark-mode .listing-vendor, html.dark-mode .welcome-card p, html.dark-mode .member-item small { color: #b2c1b5; }
+html.dark-mode input, html.dark-mode textarea, html.dark-mode select, html.dark-mode .top-search {
+  background: #111a14; color: #e5eee7; border-color: #34463a;
+}
+html.dark-mode .welcome-card, html.dark-mode .sidebar-promo { background: #223328; }
+html.dark-mode .side-divider, html.dark-mode .listing-bottom { border-color: #304136; }
+html.dark-mode .nav-item { color: #bdcbbf; }
+html.dark-mode .nav-item.active { background: #2a4332; color: #d7ead7; }
+html.dark-mode .empty-state { background: #18221c; color: #d8e4da; border-color: #304136; }
+html.dark-mode .ghost-btn, html.dark-mode .sign-in, html.dark-mode .profile-pill { color: #d8e4da; border-color: #45594a; background: #18221c; }
+@media (prefers-reduced-motion: no-preference) {
+  .listing-card, .category-card { transition: transform .22s ease, box-shadow .22s ease; }
+  .listing-card:hover, .category-card:hover { transform: translateY(-3px) perspective(900px) rotateX(1deg); }
+}
