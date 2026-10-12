@@ -2033,3 +2033,9 @@ select:focus-visible {
 .listing-bottom { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
 .listing-bottom > b { flex:0 0 auto; }
 @media(max-width:620px){ .listing-bottom { align-items:flex-start; } .listing-actions { width:100%; justify-content:flex-start; } .listing-actions button { min-height:38px; } }
+
+/* Make the notification entry point visible and tappable */
+.icon-btn.notification { position:relative; display:inline-flex; align-items:center; justify-content:center; gap:7px; width:auto; min-width:38px; padding:0 10px; color:#345541; border:1px solid #dce6d8; background:#fff; }
+.notification-label { font-size:12px; font-weight:750; }
+.notification-count { position:absolute; top:-6px; right:-5px; z-index:2; }
+@media(max-width:640px){ .icon-btn.notification { padding:0 9px; } .notification-label { display:none; } }
