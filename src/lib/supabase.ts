@@ -207,7 +207,7 @@ async function get(path: string) {
     for(const n of normalized){
       if(n.kind==='new_follower'){
         const time=Date.parse(n.created_at||'');
-        const duplicate=deduped.some((x:any)=>x.kind==='new_follower'&&x.actor_id===n.actor_id&&Math.abs(time-Date.parse(x.created_at||''))<=5000);
+        const duplicate=deduped.some((x:any)=>x.kind==='new_follower'&&x.actor_id===n.actor_id&&Math.abs(time-Date.parse(x.created_at||''))<=30000);
         if(duplicate) continue;
       }
       deduped.push(n);
