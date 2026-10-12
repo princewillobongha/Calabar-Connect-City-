@@ -298,7 +298,7 @@ export default function App() {
       setNotice('Product results are shown, but matching seller profiles could not be loaded.');
     }
   };
-  const signIn = async () {
+  const signIn = async () => {
     if (busy) return;
     setBusy(true);
     try {
