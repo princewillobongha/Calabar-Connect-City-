@@ -283,11 +283,6 @@ export default function App() {
       setBusy(false);
     }
   };
-  const signOut = async () => {
-    await auth.signOut();
-    setUser(null);
-    setNotice('You have signed out.');
-  };
   const requireMember = (message: string) => {
     if (!user) {
       setNotice(message);
