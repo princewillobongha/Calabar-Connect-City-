@@ -1,0 +1,18 @@
+{
+  "name": "Calabar Connect City",
+  "short_name": "Calabar Connect",
+  "description": "Discover local businesses, products, jobs and community groups in Calabar, Cross River State.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f8faf6",
+  "theme_color": "#315c40",
+  "icons": [
+    {
+      "src": "/calabar-connect-city-logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
