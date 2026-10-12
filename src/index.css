@@ -2024,3 +2024,12 @@ select:focus-visible {
 .member-pick-option.selected { border-color:#47724f; background:#f1f7ef; box-shadow:0 0 0 1px #47724f inset; }
 .member-pick-option .avatar { display:grid; place-items:center; flex:0 0 36px; width:36px; height:36px; border-radius:50%; background:#e6efe2; color:#315a40; font-weight:800; }
 @media (max-width:620px) { .member-pick-option { padding:9px; } .member-picker { max-height:240px; } }
+
+/* Keep listing controls separate so SOLD and Delete never overlap */
+.listing-actions { display:flex; align-items:center; justify-content:flex-end; gap:8px; flex-wrap:wrap; min-width:0; }
+.listing-actions button { display:inline-flex; align-items:center; justify-content:center; flex:0 0 auto; min-width:36px; min-height:36px; border-radius:9px; }
+.listing-actions .listing-status-button { padding:8px 10px !important; white-space:nowrap; }
+.listing-actions .listing-delete-button { position:static; margin:0; }
+.listing-bottom { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+.listing-bottom > b { flex:0 0 auto; }
+@media(max-width:620px){ .listing-bottom { align-items:flex-start; } .listing-actions { width:100%; justify-content:flex-start; } .listing-actions button { min-height:38px; } }
