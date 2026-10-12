@@ -375,6 +375,12 @@ async function post(path: string, body: any) {
     if(accept){await supabase.from('friendships').upsert({user_a:[req.sender_id,req.receiver_id].sort()[0],user_b:[req.sender_id,req.receiver_id].sort()[1]},{onConflict:'user_a,user_b'});}
     return {data:{ok:true,status:req.status}};
   }
+  const reportResolve=path.match(/^\/api\/admin\/reports\/([^/]+)\/resolve$/);
+  if(reportResolve){
+    if((user.email||'').toLowerCase()!=='princewillobongha@gmail.com') fail('Admin access required.');
+    const {data,error}=await supabase.from('moderation_reports').update({status:'resolved',reviewed_at:new Date().toISOString()}).eq('id',reportResolve[1]).select('*').single();
+    return {data:{item:ensure(data,error)}};
+  }
   const notification=path.match(/^\/api\/notifications\/([^/]+)\/read$/);
   if(notification){
     const {error}=await supabase.from('notifications').update({read_at:new Date().toISOString()}).eq('id',notification[1]).eq('user_id',user.id);
