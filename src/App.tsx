@@ -24,6 +24,11 @@ import {
   Bookmark,
   UserRound,
   BadgeCheck,
+  Moon,
+  Sun,
+  Cpu,
+  HeartPulse,
+  Wrench,
 } from 'lucide-react';
 
 type Listing = {
@@ -73,10 +78,12 @@ type Post = {
 };
 const categories = [
   { name: 'All', icon: ShoppingBag, color: 'sand' },
-  { name: 'Food', icon: Utensils, color: 'peach' },
-  { name: 'Fashion', icon: Shirt, color: 'rose' },
-  { name: 'Services', icon: BriefcaseBusiness, color: 'blue' },
-  { name: 'Jobs', icon: Sparkles, color: 'green' },
+  { name: 'Food & Restaurants', icon: Utensils, color: 'peach' },
+  { name: 'Fashion & Clothing', icon: Shirt, color: 'rose' },
+  { name: 'Electronics & Gadgets', icon: Cpu, color: 'blue' },
+  { name: 'Beauty & Personal Care', icon: HeartPulse, color: 'rose' },
+  { name: 'Repairs & Professional Services', icon: Wrench, color: 'blue' },
+  { name: 'Jobs & Opportunities', icon: Sparkles, color: 'green' },
 ];
 function money(value: string) {
   return value || 'Ask for price';
@@ -91,6 +98,8 @@ export default function App() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [saved, setSaved] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem('ccc-saved') || '[]'); } catch { return []; } });
   const [active, setActive] = useState('Discover');
+  const [darkMode, setDarkMode] = useState(() => { try { return localStorage.getItem('ccc-theme') === 'dark'; } catch { return false; } });
+  useEffect(() => { document.documentElement.classList.toggle('dark-mode', darkMode); try { localStorage.setItem('ccc-theme', darkMode ? 'dark' : 'light'); } catch {} }, [darkMode]);
   const [category, setCategory] = useState('All');
   const [query, setQuery] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
@@ -106,7 +115,6 @@ export default function App() {
     location: 'Calabar, Cross River',
     description: '',
     image: '',
-    availability_hours: '24',
     availability_note: '',
   });
   const [postText, setPostText] = useState('');
@@ -299,8 +307,8 @@ export default function App() {
         ...form,
         image: imageUrls[0] || '',
         image_urls: imageUrls,
-        available_until: form.availability_hours ? new Date(Date.now()+Number(form.availability_hours)*3600000).toISOString() : null,
-        availability_note: form.availability_note,
+        available_until: null,
+        availability_note: '',
         vendor: user.name || 'Community member',
         kind: form.category,
         created_at: new Date().toISOString(),
@@ -326,7 +334,6 @@ export default function App() {
         location: 'Calabar, Cross River',
         description: '',
         image: '',
-        availability_hours: '24',
         availability_note: '',
       });
       setNotice('Your listing is published.');
@@ -453,6 +460,7 @@ export default function App() {
           <button onClick={() => {if(!user){setShowAuth(true);return;}setMenuOpen(false);void openPublicProfile(user?.userId||user?.id);}}>My profile <UserRound size={16}/></button>
           <button onClick={() => { setShowSubscriptions(true); setMenuOpen(false); }}>Verification subscription <BadgeCheck size={16}/></button>
           <button onClick={() => { setShowCart(true); setMenuOpen(false); }}>Shopping cart ({cart.length}) <ShoppingCart size={16}/></button>
+          <button onClick={() => setDarkMode(v => !v)} aria-label={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}>{darkMode ? 'Switch to light mode' : 'Switch to dark mode'} {darkMode ? <Sun size={16}/> : <Moon size={16}/>}</button>
           {(user?.email||'').toLowerCase()==='princewillobongha@gmail.com' && <button onClick={() => { void openAdmin(); setMenuOpen(false); }}>Admin verification <ShieldCheck size={16}/></button>}
         </div>
       )}
@@ -834,6 +842,7 @@ export default function App() {
                   onOpen={setSelectedListing}
                   onContact={contactSeller}
                   currentUserId={user?.userId||user?.id}
+                  isAdmin={isAdmin}
                   onDelete={deleteListing}
                   onOpenSeller={id=>void openPublicProfile(id)}
                 />
@@ -1025,6 +1034,7 @@ export default function App() {
                 onOpen={setSelectedListing}
                 onContact={contactSeller}
                   currentUserId={user?.userId||user?.id}
+                  isAdmin={isAdmin}
                   onDelete={deleteListing}
                   onOpenSeller={id=>void openPublicProfile(id)}
               />
@@ -1221,10 +1231,12 @@ export default function App() {
                     }
                   >
                     <option>Product</option>
-                    <option>Food</option>
-                    <option>Fashion</option>
-                    <option>Services</option>
-                    <option>Jobs</option>
+                    <option>Food & Restaurants</option>
+                    <option>Fashion & Clothing</option>
+                    <option>Electronics & Gadgets</option>
+                    <option>Beauty & Personal Care</option>
+                    <option>Repairs & Professional Services</option>
+                    <option>Jobs & Opportunities</option>
                   </select>
                 </label>
                 <label>
@@ -1261,9 +1273,7 @@ export default function App() {
                   placeholder="Tell people a little more..."
                 />
               </label>
-              <label>Availability duration (hours)<input type="number" min="1" max="720" value={form.availability_hours} onChange={e=>setForm({...form,availability_hours:e.target.value})} required/><small className="fine-print">This listing will automatically disappear from the marketplace after this duration. Default: 24 hours.</small></label>
-        <label>Availability note (optional)<input value={form.availability_note} onChange={e=>setForm({...form,availability_note:e.target.value})} placeholder="e.g. Fresh meals available until 7 PM today"/></label>
-        <p className="fine-print">Contact seller opens WhatsApp with a prepared message and records the enquiry as an order on the seller's profile.</p>
+              <p className="fine-print">Your listing stays available until you mark it sold or remove it. Contact seller is enabled only for verified sellers.</p>
               <button className="primary-btn full-btn" disabled={busy}>
                 {busy ? 'Publishing…' : 'Publish listing'}{' '}
                 <ArrowUpRight size={16} />
