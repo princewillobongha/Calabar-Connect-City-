@@ -2150,3 +2150,20 @@ html.dark-mode .ghost-btn, html.dark-mode .sign-in, html.dark-mode .profile-pill
   .listing-card, .category-card { transition: transform .22s ease, box-shadow .22s ease; }
   .listing-card:hover, .category-card:hover { transform: translateY(-3px) perspective(900px) rotateX(1deg); }
 }
+
+
+/* Notification and social-feed finishing touches */
+.member-item[role="button"] { cursor:pointer; }
+.member-item[role="button"]:focus-visible,.feed-card:focus-visible { outline:2px solid #4f8a61; outline-offset:3px; }
+.feed-card { cursor:pointer; }
+.feed-card button,.feed-card input,.feed-card form,.feed-card a { cursor:auto; }
+.feed-card button { cursor:pointer; }
+.comment-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; margin:18px 0 8px; }
+.comment-heading h3 { margin:0; }
+.comment-sort { display:flex; align-items:center; gap:7px; color:#647366; font-size:12px; }
+.comment-sort select { max-width:150px; padding:7px 9px; border:1px solid #dbe5d9; border-radius:8px; background:#fff; color:#2e4936; }
+.comment-compose { display:flex; align-items:center; gap:8px; position:sticky; bottom:0; padding:10px 0 2px; background:var(--surface,#fff); }
+.comment-compose input { flex:1; min-width:0; }
+.comment-compose button { flex:0 0 42px; min-width:42px; padding:10px; }
+html.dark-mode .comment-sort,html.dark-mode .comment-sort select { color:#d8e4da; background:#111a14; border-color:#34463a; }
+@media(max-width:520px){ .comment-heading { align-items:flex-start; flex-direction:column; gap:7px; } .comment-sort { width:100%; justify-content:space-between; } .comment-sort select { flex:0 1 165px; } }
