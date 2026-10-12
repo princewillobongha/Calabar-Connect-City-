@@ -366,6 +366,9 @@ export default function App() {
   };
   const openMemberPanel = async (kind: 'friends' | 'notifications') => {
     if (!requireMember('Sign in to use member tools.')) return;
+    setShowAuth(false); setShowProfile(false); setShowListingForm(false); setShowPostForm(false);
+    setShowGroupForm(false); setShowCart(false); setShowPeople(false); setShowAdmin(false);
+    setShowSubscriptions(false); setPublicProfile(null); setSelectedListing(null); setSelectedPost(null); setMyGroupsOpen(false);
     setMemberPanel(kind);
     setMemberItems([]);
     try {
@@ -383,7 +386,6 @@ export default function App() {
   };
   const interact = (label: string) => {
     if (!requireMember('Sign in to ' + label + '.')) return;
-    if (label.includes('message')) { void openMemberPanel('messages'); return; }
     if (label.includes('notification')) { void openMemberPanel('notifications'); return; }
     if (label.startsWith('join ')) {
       const name = label.slice(5);
@@ -394,7 +396,7 @@ export default function App() {
         .catch(() => setNotice('Could not join this group. Please try again.'));
       return;
     }
-    setNotice('You are signed in. Please use the Messages or Connections tools to contact members safely.');
+    setNotice('You are signed in. Use the People directory and Connections tools to connect with members.');
   };
   const nav = ['Discover', 'Marketplace', 'Community', 'Groups', 'Businesses', 'Jobs'];
   return (
