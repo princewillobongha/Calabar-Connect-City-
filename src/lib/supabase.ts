@@ -220,6 +220,8 @@ async function get(path: string) {
 }
 async function post(path: string, body: any) {
   const user=await currentUser();
+  if(path.startsWith('/api/comments/')) fail('Comments are disabled on Calabar Connect City.');
+  if(/^\/api\/posts\/[^/]+\/share$/.test(path)) fail('Resharing is disabled on Calabar Connect City.');
   if(path==='/api/listings'){
     let {data:vendor,error:ve}=await supabase.from('vendors').select('*').eq('owner_id',user.id).maybeSingle();
     if(ve) fail(ve.message);
@@ -244,6 +246,22 @@ async function post(path: string, body: any) {
     if((listing as any).vendor?.owner_id!==user.id)fail('You can only change the status of your own listing.');
     const {data,error}=await supabase.from('listings').update({sale_status:status,updated_at:new Date().toISOString()}).eq('id',listingStatusMatch[1]).select('id,sale_status').single();
     return {data:{item:ensure(data,error)}};
+  }
+  const removeReportedContent=path.match(/^\/api\/admin\/reports\/([^/]+)\/remove-content$/);
+  if(removeReportedContent){
+    if((user.email||'').toLowerCase()!=='princewillobongha@gmail.com')fail('Admin access required.');
+    const {data:report,error:reportError}=await supabase.from('moderation_reports').select('id,target_type,target_id').eq('id',removeReportedContent[1]).single();
+    if(reportError)fail(reportError.message);
+    if(!report.target_id)fail('This report has no linked content to remove.');
+    let removeError:any=null;
+    if(report.target_type==='community_post'){const r=await supabase.from('community_posts').delete().eq('id',report.target_id);removeError=r.error;}
+    else if(report.target_type==='group_post'){const r=await supabase.from('community_group_posts').delete().eq('id',report.target_id);removeError=r.error;}
+    else if(report.target_type==='marketplace_listing'){const r=await supabase.from('listings').delete().eq('id',report.target_id);removeError=r.error;}
+    else fail('This report type cannot be removed automatically. Review the profile report manually.');
+    if(removeError)fail(removeError.message);
+    const {error:statusError}=await supabase.from('moderation_reports').update({status:'resolved',reviewed_at:new Date().toISOString()}).eq('id',report.id);
+    if(statusError)fail(statusError.message);
+    return {data:{ok:true}};
   }
   const reportResolveMatch=path.match(/^\/api\/admin\/reports\/([^/]+)\/resolve$/);
   if(reportResolveMatch){
@@ -432,6 +450,7 @@ export const auth = {
 };
 async function del(path:string){
   const user=await currentUser();
+  if(/^\/api\/posts\/[^/]+\/share$/.test(path)) fail('Resharing is disabled on Calabar Connect City.');
   const listingDelete=path.match(/^\/api\/listings\/([^/]+)$/);
   if(listingDelete){const {data:listing,error:lookupError}=await supabase.from('listings').select('id,vendor_id,vendor:vendors(owner_id)').eq('id',listingDelete[1]).single();if(lookupError)fail(lookupError.message);if((user.email||'').toLowerCase()!=='princewillobongha@gmail.com'&&(listing as any).vendor?.owner_id!==user.id)fail('You can only delete your own listing.');const {error}=await supabase.from('listings').delete().eq('id',listingDelete[1]);if(error)fail(error.message);return {data:{ok:true}};}
   const groupDelete=path.match(/^\/api\/groups\/([^/]+)$/);
