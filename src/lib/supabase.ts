@@ -310,7 +310,7 @@ async function post(path: string, body: any) {
     const {data,error}=await supabase.from('community_comments').insert({post_id:postId,author_id:user.id,text:String(body.text||'').trim(),image_url:body.image_url||null}).select('*, author_profile:profiles!community_comments_author_id_fkey(username,display_name,avatar_url,is_verified)').single();
     const comment=ensure(data,error);
     if(post?.author_id && post.author_id!==user.id){
-      await supabase.from('notifications').insert({user_id:post.author_id,actor_id:user.id,kind:'post_comment',title:'New comment on your post',body:profileName(user)+' commented on your community post.'});
+      await supabase.from('notifications').insert({user_id:post.author_id,actor_id:user.id,kind:'post_comment',title:'New comment on your post',body:profileName(user)+' commented on your community post.',target_url:'post://'+postId});
     }
     return {data:{item:comment}};
   }
@@ -323,7 +323,7 @@ async function post(path: string, body: any) {
     const {error}=await supabase.from('community_post_reactions').insert({post_id:postId,user_id:user.id});if(error)fail(error.message);
     const {data:post}=await supabase.from('community_posts').select('author_id').eq('id',postId).maybeSingle();
     if(post?.author_id && post.author_id!==user.id){
-      await supabase.from('notifications').insert({user_id:post.author_id,actor_id:user.id,kind:'post_like',title:'Someone liked your post',body:profileName(user)+' liked your community post.'});
+      await supabase.from('notifications').insert({user_id:post.author_id,actor_id:user.id,kind:'post_like',title:'Someone liked your post',body:profileName(user)+' liked your community post.',target_url:'post://'+postId});
     }
     return {data:{liked:true}};
   }
@@ -404,14 +404,14 @@ export const auth = {
   async signIn(email?:string,password?:string,mode:'signin'|'signup'='signin'){
     if(!email||!password) throw new Error('Enter your email and password.');
     const result=mode==='signup'
-      ? await supabase.auth.signUp({email,password,options:{data:{display_name:'Calabar Member'},emailRedirectTo:'https://calabar-connect-city-omega.vercel.app/'}})
+      ? await supabase.auth.signUp({email,password,options:{data:{display_name:'Calabar Member'},emailRedirectTo:window.location.origin + '/'}})
       : await supabase.auth.signInWithPassword({email,password});
     if(result.error)throw result.error;
     if(!result.data.user)throw new Error('Could not complete authentication.');
     if(mode==='signup'&&!result.data.session) return {user:{userId:result.data.user.id,email:result.data.user.email,name:profileName(result.data.user)},confirmationRequired:true};
     return {user:{userId:result.data.user.id,email:result.data.user.email,name:profileName(result.data.user)}};
   },
-  async resendConfirmation(email:string){const {error}=await supabase.auth.resend({type:'signup',email,options:{emailRedirectTo:'https://calabar-connect-city-omega.vercel.app/'}});if(error)throw error;},
+  async resendConfirmation(email:string){const {error}=await supabase.auth.resend({type:'signup',email,options:{emailRedirectTo:window.location.origin + '/'}});if(error)throw error;},
   async signOut(){const {error}=await supabase.auth.signOut();if(error)throw error;}
 };
 async function del(path:string){
