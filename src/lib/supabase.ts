@@ -47,7 +47,7 @@ export async function uploadImage(file: File) {
 }
 async function get(path: string) {
   if (path === '/api/discover/businesses') {
-    const {data:vendors,error}=await supabase.from('vendors').select('id,owner_id,business_name,category,description,address,area,cover_image_url,is_open,availability_note,created_at').order('created_at',{ascending:false}).limit(100);
+    const {data:vendors,error}=await supabase.from('vendors').select('id,owner_id,business_name,category,description,address,area,cover_image_url,is_open,availability_note,created_at').eq('is_open',true).order('created_at',{ascending:false}).limit(100);
     const rows=ensure(vendors,error);
     const ownerIds=[...new Set(rows.map((v:any)=>v.owner_id).filter(Boolean))];
     const vendorIds=rows.map((v:any)=>v.id);
