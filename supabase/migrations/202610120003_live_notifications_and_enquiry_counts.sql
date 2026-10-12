@@ -91,6 +91,11 @@ revoke all on function public.notify_new_community_post() from public;
 revoke all on function public.notify_new_group_post() from public;
 revoke all on function public.notify_new_follower() from public;
 revoke all on function public.increment_listing_enquiry_count() from public;
+revoke all on function public.notify_new_listing() from anon, authenticated;
+revoke all on function public.notify_new_community_post() from anon, authenticated;
+revoke all on function public.notify_new_group_post() from anon, authenticated;
+revoke all on function public.notify_new_follower() from anon, authenticated;
+revoke all on function public.increment_listing_enquiry_count() from anon, authenticated;
 
 do $$
 begin
