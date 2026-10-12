@@ -201,8 +201,13 @@ async function get(path: string) {
   if (path === '/api/admin/reports') {
     if ((user.email||'').toLowerCase() !== 'princewillobongha@gmail.com') fail('Admin access required.');
     const {data,error}=await supabase.from('moderation_reports').select('*').order('created_at',{ascending:false}).limit(300);
-    return {data:{items:ensure(data,error)}};
+    const rows=ensure(data,error), ids=[...new Set(rows.map((x:any)=>x.reporter_id).filter(Boolean))];
+    const {data:profiles,error:pe}=ids.length?await supabase.from('profiles').select('id,username,display_name,avatar_url').in('id',ids):{data:[],error:null};if(pe)fail(pe.message);
+    const pm=new Map((profiles||[]).map((p:any)=>[p.id,p]));
+    return {data:{items:rows.map((x:any)=>({...x,reporter:pm.get(x.reporter_id)||null,reporter_name:(pm.get(x.reporter_id) as any)?.display_name||(pm.get(x.reporter_id) as any)?.username||'Unknown member'}))}};
   }
+  const reportMessages=path.match(/^\/api\/reports\/([^/]+)\/messages$/);
+  if(reportMessages){const rid=reportMessages[1];const {data:rep,error:re}=await supabase.from('moderation_reports').select('id,reporter_id').eq('id',rid).single();if(re)fail(re.message);if(rep.reporter_id!==user.id&&(user.email||'').toLowerCase()!=='princewillobongha@gmail.com')fail('You cannot access this report conversation.');const {data,error}=await supabase.from('report_messages').select('*').eq('report_id',rid).order('created_at',{ascending:true});return {data:{items:ensure(data,error)}};}
   if (path === '/api/reports/mine') {
     const {data,error}=await supabase.from('moderation_reports').select('*').eq('reporter_id',user.id).order('created_at',{ascending:false});
     return {data:{items:ensure(data,error)}};
@@ -292,7 +297,8 @@ async function post(path: string, body: any) {
   const groupPostMatch=path.match(/^\/api\/groups\/([^/]+)\/posts$/);
   if(groupPostMatch){
     const text=String(body.text||'').trim();if(!text)fail('Write something before posting in the group.');
-    const {data,error}=await supabase.from('community_group_posts').insert({group_id:groupPostMatch[1],author_id:user.id,text,image_url:body.image_url||null}).select('*').single();
+    const names=[...String(text).matchAll(/@([a-zA-Z0-9_.-]+)/g)].map((m:any)=>m[1].toLowerCase());let mentioned_user_ids:string[]=[];if(names.length){const {data:tagged,error:te}=await supabase.from('profiles').select('id,username').in('username',names);if(te)fail(te.message);mentioned_user_ids=(tagged||[]).filter((p:any)=>p.id!==user.id).map((p:any)=>p.id);}
+    const {data,error}=await supabase.from('community_group_posts').insert({group_id:groupPostMatch[1],author_id:user.id,text,image_url:body.image_url||null,mentioned_user_ids}).select('*').single();
     const p=ensure(data,error);
     const {data:author,error:authorError}=await supabase.from('profiles').select('id,username,display_name,avatar_url,is_verified,verified_until').eq('id',user.id).maybeSingle();
     if(authorError) fail(authorError.message);
@@ -303,6 +309,10 @@ async function post(path: string, body: any) {
     const {data,error}=await supabase.from('community_groups').update({avatar_url:body.avatar_url||null,description:String(body.description||'').trim()}).eq('id',groupUpdateMatch[1]).eq('owner_id',user.id).select('*').single();
     return {data:{item:ensure(data,error)}};
   }
+  const pinPost=path.match(/^\/api\/posts\/([^/]+)\/pin$/);
+  if(pinPost){if((user.email||'').toLowerCase()!=='princewillobongha@gmail.com')fail('Admin access required.');const {data:p,error:pe}=await supabase.from('community_posts').select('id,pinned_at').eq('id',pinPost[1]).single();if(pe)fail(pe.message);const pinned_at=p.pinned_at?null:new Date().toISOString();const {error}=await supabase.from('community_posts').update({pinned_at}).eq('id',p.id);if(error)fail(error.message);return {data:{pinned:!!pinned_at}};}
+  const pinGroup=path.match(/^\/api\/groups\/([^/]+)\/posts\/([^/]+)\/pin$/);
+  if(pinGroup){if((user.email||'').toLowerCase()!=='princewillobongha@gmail.com')fail('Admin access required.');const {data:p,error:pe}=await supabase.from('community_group_posts').select('id,pinned_at').eq('id',pinGroup[2]).eq('group_id',pinGroup[1]).single();if(pe)fail(pe.message);const pinned_at=p.pinned_at?null:new Date().toISOString();const {error}=await supabase.from('community_group_posts').update({pinned_at}).eq('id',p.id);if(error)fail(error.message);return {data:{pinned:!!pinned_at}};}
   if(path.startsWith('/api/comments/')){
     const postId=path.split('/')[3];
     const {data:post,error:postError}=await supabase.from('community_posts').select('author_id').eq('id',postId).maybeSingle();
@@ -341,7 +351,8 @@ async function post(path: string, body: any) {
     return {data:{ok:true,item:{id:repost.id,original_post_id:postId}}};
   }
   if(path==='/api/posts'){
-    const {data,error}=await supabase.from('community_posts').insert({author_id:user.id,text:body.text,image_url:body.image_url||null,category:body.category||'Community'}).select('*, author_profile:profiles!community_posts_author_id_fkey(display_name,username,avatar_url,is_verified)').single();
+    const textValue=String(body.text||''),names=[...textValue.matchAll(/@([a-zA-Z0-9_.-]+)/g)].map((m:any)=>m[1].toLowerCase());let mentioned_user_ids:string[]=[];if(names.length){const {data:tagged,error:te}=await supabase.from('profiles').select('id,username').in('username',names);if(te)fail(te.message);mentioned_user_ids=(tagged||[]).filter((p:any)=>p.id!==user.id).map((p:any)=>p.id);}
+    const {data,error}=await supabase.from('community_posts').insert({author_id:user.id,text:textValue,image_url:body.image_url||null,category:body.category||'Community',mentioned_user_ids}).select('*, author_profile:profiles!community_posts_author_id_fkey(display_name,username,avatar_url,is_verified)').single();
     const p=ensure(data,error);return {data:{item:{id:p.id,text:p.text,image_url:p.image_url||null,author:p.author_profile?.display_name||profileName(user),author_id:p.author_id,avatar_url:p.author_profile?.avatar_url||null,is_verified:!!p.author_profile?.is_verified,category:p.category,created_at:p.created_at}}};
   }
   if(path.startsWith('/api/groups/')&&path.endsWith('/join')){
@@ -388,9 +399,12 @@ async function post(path: string, body: any) {
     const {error}=await supabase.from('notifications').update({read_at:new Date().toISOString()}).eq('id',notification[1]).eq('user_id',user.id);
     if(error) fail(error.message);return {data:{ok:true}};
   }
+  const reportReply=path.match(/^\/api\/reports\/([^/]+)\/messages$/);
+  if(reportReply){const rid=reportReply[1],admin=(user.email||'').toLowerCase()==='princewillobongha@gmail.com';const {data:rep,error:re}=await supabase.from('moderation_reports').select('id,reporter_id').eq('id',rid).single();if(re)fail(re.message);if(rep.reporter_id!==user.id&&!admin)fail('You cannot reply to this report.');const message=String(body.message||'').trim();if(!message)fail('Write a message first.');const {data,error}=await supabase.from('report_messages').insert({report_id:rid,sender_id:user.id,message}).select('*').single();const item=ensure(data,error);if(admin)await supabase.from('notifications').insert({user_id:rep.reporter_id,actor_id:user.id,kind:'report_reply',title:'The admin replied to your report',body:profileName(user)+' replied to your report.',target_url:'report://'+rid});return {data:{item}};}
   if(path==='/api/reports'){
-    const {data,error}=await supabase.from('moderation_reports').insert({reporter_id:user.id,target_type:body.target_type||'community_content',target_id:body.target_id||null,reason:body.reason,details:body.details||'',status:'open'}).select('*').single();
-    return {data:{item:ensure(data,error)}};
+    const reason=String(body.reason||'').trim();if(!reason)fail('Write a report message first.');
+    const {data,error}=await supabase.from('moderation_reports').insert({reporter_id:user.id,target_type:body.target_type||'community_content',target_id:body.target_id||null,reason,details:body.details||'',status:'open'}).select('*').single();
+    const report=ensure(data,error);const {error:me}=await supabase.from('report_messages').insert({report_id:report.id,sender_id:user.id,message:reason});if(me)fail(me.message);return {data:{item:report}};
   }
   fail('Unsupported API route: '+path);
 }
@@ -437,11 +451,11 @@ async function del(path:string){
     return {data:{ok:true}};
   }
   const groupPostDelete=path.match(/^\/api\/groups\/([^/]+)\/posts\/([^/]+)$/);
-  if(groupPostDelete){const {error}=await supabase.from('community_group_posts').delete().eq('id',groupPostDelete[2]).eq('group_id',groupPostDelete[1]);if(error)fail(error.message);return {data:{ok:true}};}
+  if(groupPostDelete){const admin=(user.email||'').toLowerCase()==='princewillobongha@gmail.com';let q=supabase.from('community_group_posts').delete().eq('id',groupPostDelete[2]).eq('group_id',groupPostDelete[1]);if(!admin)q=q.eq('author_id',user.id);const {error}=await q;if(error)fail(error.message);return {data:{ok:true}};}
   const groupMemberDelete=path.match(/^\/api\/groups\/([^/]+)\/members\/([^/]+)$/);
   if(groupMemberDelete){const {error}=await supabase.from('group_members').delete().eq('group_id',groupMemberDelete[1]).eq('user_id',groupMemberDelete[2]);if(error)fail(error.message);return {data:{ok:true}};}
   const postDelete=path.match(/^\/api\/posts\/([^/]+)$/);
-  if(postDelete){const {error}=await supabase.from('community_posts').delete().eq('id',postDelete[1]).eq('author_id',user.id);if(error)fail(error.message);return {data:{ok:true}};}
+  if(postDelete){const admin=(user.email||'').toLowerCase()==='princewillobongha@gmail.com';let q=supabase.from('community_posts').delete().eq('id',postDelete[1]);if(!admin)q=q.eq('author_id',user.id);const {error}=await q;if(error)fail(error.message);return {data:{ok:true}};}
   const unshare=path.match(/^\/api\/posts\/([^/]+)\/share$/);
   if(unshare){const postId=unshare[1];const {data:share,error:se}=await supabase.from('community_post_shares').select('repost_id').eq('post_id',postId).eq('user_id',user.id).maybeSingle();if(se)fail(se.message);if(!share)return {data:{ok:true,shared:false}};if(share.repost_id){const {error}=await supabase.from('community_posts').delete().eq('id',share.repost_id).eq('author_id',user.id);if(error)fail(error.message);}const {error}=await supabase.from('community_post_shares').delete().eq('post_id',postId).eq('user_id',user.id);if(error)fail(error.message);return {data:{ok:true,shared:false}};}
   fail('Unsupported DELETE route: '+path);
