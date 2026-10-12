@@ -2169,3 +2169,82 @@ html.dark-mode .comment-sort,html.dark-mode .comment-sort select { color:#d8e4da
 @media(max-width:520px){ .comment-heading { align-items:flex-start; flex-direction:column; gap:7px; } .comment-sort { width:100%; justify-content:space-between; } .comment-sort select { flex:0 1 165px; } }
 
 .post-view-count{display:inline-flex;align-items:center;gap:5px;color:var(--muted,#6b7280);font-size:.82rem;padding:.45rem .35rem;white-space:nowrap}.report-chat-messages{display:flex;flex-direction:column;gap:10px;max-height:44vh;overflow:auto;padding:8px 0}.report-chat-messages>p{align-self:flex-start;max-width:92%;padding:12px 14px;border:1px solid var(--border,#e5e7eb);border-radius:14px;background:var(--surface,#f9fafb);overflow-wrap:anywhere}.report-chat-messages small{display:block;margin-top:6px;opacity:.7;font-size:.72rem}.profile-follow-counts button{border:0;background:transparent;color:inherit;cursor:pointer;text-align:center;font:inherit;padding:0}.profile-follow-counts button:hover{text-decoration:underline}.mobile-panel .danger-link{color:#c0392b}.see-more-marketplace{display:flex;align-items:center;justify-content:center;gap:6px;margin:18px auto 0}
+
+
+/* Calabar Connect City: reachable mobile menu, pinned posts, notifications and announcements */
+@media (max-width: 760px) {
+  .mobile-panel {
+    max-height: calc(100dvh - 84px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+    padding-bottom: max(10px, env(safe-area-inset-bottom));
+  }
+  .mobile-panel > button { flex: 0 0 auto; min-height: 44px; }
+}
+.notification-list-actions {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:10px 2px 12px;
+  margin-bottom:6px;
+  border-bottom:1px solid rgba(100,120,100,.18);
+  color:var(--muted,#667468);
+  font-size:12px;
+  font-weight:700;
+}
+.notification-list-actions .danger-link { border:0; background:transparent; font-weight:800; cursor:pointer; }
+.notification-item-actions { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:8px; }
+.notification-delete-button {
+  display:inline-grid;
+  place-items:center;
+  width:34px;
+  height:34px;
+  flex:0 0 34px;
+  border:1px solid #f0d5d5;
+  border-radius:9px;
+  color:#b4232d;
+  background:#fff8f8;
+  cursor:pointer;
+}
+.notification-delete-button:hover { background:#ffecec; }
+.pinned-post-label {
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  width:max-content;
+  max-width:100%;
+  margin:0 0 9px;
+  padding:5px 9px;
+  border-radius:999px;
+  color:#315f3b;
+  background:#e9f4e8;
+  border:1px solid #cfe3cd;
+  font-size:11px;
+  line-height:1.2;
+  font-weight:800;
+}
+.feed-card-pinned { border-color:#c9dfc8 !important; }
+.post-detail-author .pinned-post-label { align-self:flex-start; }
+.admin-announcements {
+  margin:18px 0 22px;
+  padding:16px;
+  border:1px solid #dce8d9;
+  border-radius:14px;
+  background:#f7faf5;
+}
+.admin-announcements h3 { margin:0 0 6px; color:#2d5137; }
+.admin-announcements > p { margin:0 0 14px; color:#687568; font-size:12px; line-height:1.5; }
+.admin-announcements label { display:block; margin:12px 0; }
+.admin-announcements input,.admin-announcements textarea { width:100%; margin-top:6px; }
+.admin-announcements textarea { resize:vertical; }
+.announcement-history { display:grid; gap:8px; margin-top:18px; }
+.announcement-history > b { color:#31583a; }
+.announcement-modal-backdrop { z-index:12000 !important; }
+.announcement-modal { z-index:12001 !important; }
+.announcement-message { white-space:pre-wrap; overflow-wrap:anywhere; line-height:1.65; }
+html.dark-mode .admin-announcements { background:#1b2a20; border-color:#304136; }
+html.dark-mode .admin-announcements h3,html.dark-mode .announcement-history > b { color:#d8e8d7; }
+html.dark-mode .admin-announcements > p { color:#b2c1b5; }
