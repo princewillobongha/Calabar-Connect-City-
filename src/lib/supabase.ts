@@ -99,7 +99,7 @@ async function get(path: string) {
     const groupId=groupDetailMatch[1];
     const {data:group,error:groupError}=await supabase.from('community_groups').select('*').eq('id',groupId).single();
     if(groupError) fail(groupError.message);
-    const {data:posts,error:postsError}=await supabase.from('community_group_posts').select('*').eq('group_id',groupId).order('created_at',{ascending:false}).limit(100);
+    const {data:posts,error:postsError}=await supabase.from('community_group_posts').select('*').eq('group_id',groupId).order('pinned_at',{ascending:false,nullsFirst:false}).order('created_at',{ascending:false}).limit(100);
     if(postsError) fail(postsError.message);
     const {data:memberRows,error:membersError}=await supabase.from('group_members').select('user_id,role,status,joined_at').eq('group_id',groupId).eq('status','active');
     if(membersError) fail(membersError.message);
@@ -172,7 +172,7 @@ async function get(path: string) {
     return {data:{items:ensure(data,error)}};
   }
   if (path === '/api/posts') {
-    const {data,error}=await supabase.from('community_posts').select('*').order('created_at',{ascending:false}).limit(80);
+    const {data,error}=await supabase.from('community_posts').select('*').order('pinned_at',{ascending:false,nullsFirst:false}).order('created_at',{ascending:false}).limit(80);
     const rows=ensure(data,error);const ids=rows.map((p:any)=>p.author_id);const postIds=rows.map((p:any)=>p.id);
     const [{data:profiles,error:pe},{data:likes,error:le},{data:shares,error:se},{data:comments,error:ce},{data:{user:viewer}}]=await Promise.all([
       ids.length?supabase.from('profiles').select('id,display_name,username,avatar_url,is_verified,verified_until').in('id',[...new Set(ids)]):Promise.resolve({data:[],error:null}),
