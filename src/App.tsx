@@ -161,11 +161,11 @@ export default function App() {
   useEffect(() => {
     const id=user?.userId||user?.id; if(!id) { setUnreadNotifications(0); return; }
     let live=true;
-    const refresh=async()=>{try{const r=await api.get('/api/notifications');if(live)setUnreadNotifications((r.data?.items||[]).filter((n:any)=>!n.read).length);}catch{}};
+    const refresh=async()=>{try{const r=await api.get('/api/notifications');const items=r.data?.items||[];if(live){setUnreadNotifications(items.filter((n:any)=>!n.read).length);if(memberPanel==='notifications')setMemberItems(items);}}catch{}};
     void refresh();
     const channel=supabase.channel('calabar-notifications-'+id).on('postgres_changes',{event:'INSERT',schema:'public',table:'notifications',filter:'user_id=eq.'+id},()=>{void refresh();}).subscribe();
     return ()=>{live=false;void supabase.removeChannel(channel);};
-  },[user?.userId,user?.id]);
+  },[user?.userId,user?.id,memberPanel]);
   const overlayStates = { showAuth, showProfile, showListingForm, showPostForm, showGroupForm, showCart, showPeople, showAdmin, showSubscriptions, publicProfile:!!publicProfile, selectedListing:!!selectedListing, selectedPost:!!selectedPost, myGroupsOpen };
   const previousOverlayRef = useRef<Record<string, boolean>>({});
   useEffect(() => {
@@ -193,6 +193,12 @@ export default function App() {
   useEffect(()=>{if(active!=='Businesses')return;let live=true;api.get('/api/discover/businesses').then(r=>{if(live)setBusinesses(r.data?.items||[]);}).catch((e:any)=>{if(live)setNotice(e?.message||'Could not load local businesses.');});return()=>{live=false;};},[active]);
   useEffect(() => {
     let live = true;
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session?.user) {
+        const u:any = session.user;
+        setUser((previous:any) => ({...u, userId:u.id, email:u.email, name:u.user_metadata?.display_name || u.user_metadata?.full_name || previous?.name || u.email?.split('@')[0] || 'Calabar Member'}));
+      } else if (event === 'SIGNED_OUT') setUser(null);
+    });
     Promise.all([
       auth.getUser().catch(() => null),
       api.get('/api/listings').catch(() => ({ data: { items: [] } })),
@@ -210,6 +216,7 @@ export default function App() {
     });
     return () => {
       live = false;
+      authListener.subscription.unsubscribe();
     };
   }, []);
   const filtered = useMemo(
