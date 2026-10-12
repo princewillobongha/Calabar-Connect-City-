@@ -2306,3 +2306,7 @@ html.dark-mode .marketplace-search-form,html.dark-mode .marketplace-seller-resul
 .admin-capacity-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.admin-capacity-metrics span{display:grid;gap:5px;padding:12px 10px;border:1px solid #dbe7d8;border-radius:12px;background:rgba(255,255,255,.8)}.admin-capacity-metrics b{font-size:22px;line-height:1;color:#294f33}.admin-capacity-metrics small{font-size:10px;color:#687568}
 html.dark-mode .admin-capacity-panel{background:#1b2a20;border-color:#304136}html.dark-mode .admin-capacity-panel h3,html.dark-mode .admin-capacity-metrics b{color:#d8e8d7}html.dark-mode .admin-capacity-panel p,html.dark-mode .admin-capacity-metrics small{color:#b2c1b5}html.dark-mode .admin-capacity-metrics span{background:#17231a;border-color:#344738}
 @media(max-width:720px){.admin-capacity-panel{grid-template-columns:1fr}.admin-capacity-metrics{grid-template-columns:repeat(3,minmax(0,1fr))}.admin-capacity-metrics span{padding:10px 7px}.admin-capacity-metrics b{font-size:19px}.admin-capacity-metrics small{font-size:9px}}
+
+/* Keep the enlarged profile-photo button aligned with the profile cover overlap */
+.public-profile-avatar-button{position:relative;width:92px;height:50px;margin:-48px 0 6px 12px;flex:0 0 92px;overflow:visible}
+.public-profile-avatar-button .public-profile-avatar{position:absolute;top:-44px;left:0;width:92px;height:92px;margin:0}
