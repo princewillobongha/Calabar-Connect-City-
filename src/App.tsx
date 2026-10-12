@@ -215,10 +215,20 @@ export default function App() {
   const filtered = useMemo(
     () =>
       listings.filter(item => {
-        const matchesCategory =
-          category === 'All' ||
-          String(item.category || '').toLowerCase().includes(category.toLowerCase()) ||
-          String(item.kind || '').toLowerCase().includes(category.toLowerCase());
+        const categoryNeedle = ({
+          'Food & Restaurants': 'food',
+          'Fashion & Clothing': 'fashion',
+          'Electronics & Gadgets': 'gadget',
+          'Beauty & Personal Care': 'beauty',
+          'Repairs & Professional Services': 'service',
+          'Jobs & Opportunities': 'job',
+        } as Record<string, string>)[category] || category.toLowerCase();
+        const itemCategory = (String(item.category || '') + ' ' + String(item.kind || '')).toLowerCase();
+        const matchesCategory = category === 'All' ||
+          itemCategory.includes(categoryNeedle) ||
+          (category === 'Electronics & Gadgets' && /electronics|electronic|gadget|phone|computer|laptop/.test(itemCategory)) ||
+          (category === 'Beauty & Personal Care' && /beauty|personal care|cosmetic|skincare|hair/.test(itemCategory)) ||
+          (category === 'Repairs & Professional Services' && /repair|service|professional/.test(itemCategory));
         const text = (
           item.title +
           ' ' +
