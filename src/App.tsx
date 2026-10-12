@@ -1389,6 +1389,7 @@ function ListingGrid({
   onMarkSold,
   onDelete,
   currentUserId,
+  isAdmin = false,
 }: {
   items: Listing[];
   saved: string[];
