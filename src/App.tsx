@@ -1461,6 +1461,7 @@ function ListingGrid({
   onContact: (item: Listing) => void;
   onOpenSeller: (id: string) => void;
   onMarkSold: (item:Listing) => void;
+  onRate?: (item: Listing, rating: number) => void;
   currentUserId?: string;
   isAdmin?: boolean;
   onDelete: (id:string) => void;
