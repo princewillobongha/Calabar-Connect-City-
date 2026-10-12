@@ -93,6 +93,14 @@ const categories = [
 function money(value: string) {
   return value || 'Ask for price';
 }
+function shuffleList<T>(items: T[]): T[] {
+  const shuffled = [...items];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+}
 export default function App() {
   const [user, setUser] = useState<any>(null);
   const isAdmin = (user?.email || '').toLowerCase() === 'princewillobongha@gmail.com';
@@ -135,6 +143,7 @@ export default function App() {
   const [listingImage, setListingImage] = useState<File[]>([]);
   const [postImage, setPostImage] = useState<File|null>(null);
   const [showProfile, setShowProfile] = useState(false);
+  const [showAbout, setShowAbout] = useState(false);
   const [profile, setProfile] = useState<any>({username:'',display_name:'',full_name:'',bio:'',avatar_url:''});
   const [showGroupForm, setShowGroupForm] = useState(false);
   const [showCart, setShowCart] = useState(false);
@@ -174,7 +183,7 @@ export default function App() {
     const channel=supabase.channel('calabar-notifications-'+id).on('postgres_changes',{event:'INSERT',schema:'public',table:'notifications',filter:'user_id=eq.'+id},()=>{void refresh();}).subscribe();
     return ()=>{live=false;void supabase.removeChannel(channel);};
   },[user?.userId,user?.id,memberPanel]);
-  const overlayStates = { showAuth, showProfile, showListingForm, showPostForm, showGroupForm, showCart, showPeople, showAdmin, showSubscriptions, publicProfile:!!publicProfile, selectedListing:!!selectedListing, selectedPost:!!selectedPost, myGroupsOpen };
+  const overlayStates = { showAuth, showProfile, showAbout, showListingForm, showPostForm, showGroupForm, showCart, showPeople, showAdmin, showSubscriptions, publicProfile:!!publicProfile, selectedListing:!!selectedListing, selectedPost:!!selectedPost, myGroupsOpen };
   const previousOverlayRef = useRef<Record<string, boolean>>({});
   useEffect(() => {
     const previous = previousOverlayRef.current;
@@ -183,6 +192,7 @@ export default function App() {
     if (!newlyOpened) return;
     if (newlyOpened !== 'showAuth') setShowAuth(false);
     if (newlyOpened !== 'showProfile') setShowProfile(false);
+    if (newlyOpened !== 'showAbout') setShowAbout(false);
     if (newlyOpened !== 'showListingForm') setShowListingForm(false);
     if (newlyOpened !== 'showPostForm') setShowPostForm(false);
     if (newlyOpened !== 'showGroupForm') setShowGroupForm(false);
@@ -195,9 +205,9 @@ export default function App() {
     if (newlyOpened !== 'selectedPost') setSelectedPost(null);
     if (newlyOpened !== 'myGroupsOpen') setMyGroupsOpen(false);
     setMemberPanel(null);
-  }, [showAuth, showProfile, showListingForm, showPostForm, showGroupForm, showCart, showPeople, showAdmin, showSubscriptions, publicProfile, selectedListing, selectedPost, myGroupsOpen]);
-  useEffect(()=>{const anyModal=showAuth||showProfile||showListingForm||showPostForm||showGroupForm||showCart||showPeople||showAdmin||showSubscriptions||!!publicProfile||!!selectedListing||!!selectedPost||myGroupsOpen;document.body.style.overflow=anyModal?'hidden':'';const onKey=(e:KeyboardEvent)=>{if(e.key==='Escape'){setShowAuth(false);setShowProfile(false);setShowListingForm(false);setShowPostForm(false);setShowGroupForm(false);setShowCart(false);setShowPeople(false);setShowAdmin(false);setShowSubscriptions(false);setPublicProfile(null);setSelectedListing(null);setSelectedPost(null);setMyGroupsOpen(false);}};window.addEventListener('keydown',onKey);return()=>{document.body.style.overflow='';window.removeEventListener('keydown',onKey);};},[showAuth,showProfile,showListingForm,showPostForm,showGroupForm,showCart,showPeople,showAdmin,showSubscriptions,publicProfile,selectedListing,selectedPost,myGroupsOpen]);
-  useEffect(()=>{setSelectedListing(null);setSelectedPost(null);setPublicProfile(null);setShowAuth(false);setShowProfile(false);setShowListingForm(false);setShowPostForm(false);setShowGroupForm(false);setShowCart(false);setShowPeople(false);setShowAdmin(false);setShowSubscriptions(false);setMyGroupsOpen(false);setMemberPanel(null);setMenuOpen(false);},[active]);
+  }, [showAuth, showProfile, showAbout, showListingForm, showPostForm, showGroupForm, showCart, showPeople, showAdmin, showSubscriptions, publicProfile, selectedListing, selectedPost, myGroupsOpen]);
+  useEffect(()=>{const anyModal=showAuth||showProfile||showAbout||showListingForm||showPostForm||showGroupForm||showCart||showPeople||showAdmin||showSubscriptions||!!publicProfile||!!selectedListing||!!selectedPost||myGroupsOpen;document.body.style.overflow=anyModal?'hidden':'';const onKey=(e:KeyboardEvent)=>{if(e.key==='Escape'){setShowAuth(false);setShowProfile(false);setShowAbout(false);setShowListingForm(false);setShowPostForm(false);setShowGroupForm(false);setShowCart(false);setShowPeople(false);setShowAdmin(false);setShowSubscriptions(false);setPublicProfile(null);setSelectedListing(null);setSelectedPost(null);setMyGroupsOpen(false);}};window.addEventListener('keydown',onKey);return()=>{document.body.style.overflow='';window.removeEventListener('keydown',onKey);};},[showAuth,showProfile,showAbout,showListingForm,showPostForm,showGroupForm,showCart,showPeople,showAdmin,showSubscriptions,publicProfile,selectedListing,selectedPost,myGroupsOpen]);
+  useEffect(()=>{setSelectedListing(null);setSelectedPost(null);setPublicProfile(null);setShowAuth(false);setShowProfile(false);setShowAbout(false);setShowListingForm(false);setShowPostForm(false);setShowGroupForm(false);setShowCart(false);setShowPeople(false);setShowAdmin(false);setShowSubscriptions(false);setMyGroupsOpen(false);setMemberPanel(null);setMenuOpen(false);},[active]);
   useEffect(()=>{if(active!=='Businesses')return;let live=true;api.get('/api/discover/businesses').then(r=>{if(live)setBusinesses(r.data?.items||[]);}).catch((e:any)=>{if(live)setNotice(e?.message||'Could not load local businesses.');});return()=>{live=false;};},[active]);
   useEffect(() => {
     let live = true;
@@ -289,7 +299,7 @@ export default function App() {
     return true;
   };
   useEffect(() => { localStorage.setItem('ccc-cart', JSON.stringify(cart)); }, [cart]);
-  const searchPeople = async () => { try { const r=await api.get('/api/people?q='+encodeURIComponent(peopleQuery)); setPeople(r.data?.items||[]); } catch { setNotice('Could not search members.'); } };
+  const searchPeople = async () => { try { const r=await api.get('/api/people?q='+encodeURIComponent(peopleQuery)); setPeople(shuffleList(r.data?.items||[])); } catch { setNotice('Could not search members.'); } };
   const togglePersonFollow = async (person:any) => { if(!requireMember('follow members'))return; try { const r=await api.post('/api/follows/toggle',{followed_id:person.id}); const following=!!r.data?.following; setPeople(prev=>prev.map(p=>p.id===person.id?({...p,is_following:following}):p)); setNotice(following?'You are now following '+(person.display_name||person.username||'this member')+'.':'You unfollowed this member.'); } catch(e:any) { setNotice(e?.message||'Could not update follow status.'); } };
   const sendFriendRequest = async (person:any) => { if(!requireMember('send a friend request'))return; try { if(person.friend_request_direction==='received'&&person.friend_request_id){await api.post('/api/friends/'+person.friend_request_id+'/respond',{accept:true});setPeople(prev=>prev.map(p=>p.id===person.id?({...p,friend_status:'accepted'}):p));setNotice('You are now connected with '+(person.display_name||person.username||'this member')+'.');return;} await api.post('/api/friends/request',{to_id:person.id});setPeople(prev=>prev.map(p=>p.id===person.id?({...p,friend_status:'pending',friend_request_direction:'sent'}):p));setNotice('Friend request sent.'); } catch(e:any) { setNotice(e?.message||'Could not send the friend request.'); } };
   const sendReport = async () => {if(!reportTarget||!requireMember('send a report'))return;const reason=reportText.trim();if(!reason){setNotice('Write your report message first.');return;}setReportBusy(true);try{await api.post('/api/reports',{target_type:reportTarget.type,target_id:reportTarget.id,reason});setReportTarget(null);setReportText('');setNotice('Your report has been successfully sent to the admin. It will be reviewed.');}catch(e:any){setNotice(e?.message||'Could not send your report.');}finally{setReportBusy(false);}};
@@ -465,7 +475,7 @@ export default function App() {
     try {
       if (kind === 'friends') {
         const peopleResult = await api.get('/api/people');
-        setPeople(peopleResult.data?.items || []);
+        setPeople(shuffleList(peopleResult.data?.items || []));
       }
       const path = kind === 'friends' ? '/api/friends' : '/api/notifications';
       const result = await api.get(path);
@@ -496,7 +506,7 @@ export default function App() {
         <a className="brand brand-logo-only" href="#home" aria-label="Calabar Connect City home" onClick={() => {setActive('Discover');setSelectedGroup(null);}}><span className="brand-wordmark">Calabar Connect City</span></a>
   
         <div className="top-actions">
-          <button className="icon-btn header-search" aria-label="Search members" onClick={()=>{setActive('Search');setSelectedGroup(null);setMemberPanel(null);setPeopleQuery('');void api.get('/api/people').then(r=>setPeople(r.data?.items||[])).catch(()=>setNotice('Could not load members. Please try again.'));}}>
+          <button className="icon-btn header-search" aria-label="Search members" onClick={()=>{setActive('Search');setSelectedGroup(null);setMemberPanel(null);setPeopleQuery('');void api.get('/api/people').then(r=>setPeople(shuffleList(r.data?.items||[]))).catch(()=>setNotice('Could not load members. Please try again.'));}}>
             <Search size={19}/>
           </button>
           <button
@@ -542,6 +552,7 @@ export default function App() {
             </button>
           ))}
           <button onClick={() => { setShowListingForm(true); setMenuOpen(false); }}>List a business or item <Plus size={16} /></button>
+          <button onClick={() => { setMenuOpen(false); void openMemberPanel('notifications'); }}>Notifications <Bell size={16}/>{unreadNotifications>0&&<span className="menu-notification-count">{unreadNotifications>99?'99+':unreadNotifications}</span>}</button>
           <button onClick={() => {if(!user){setShowAuth(true);return;}setMenuOpen(false);void openPublicProfile(user?.userId||user?.id);}}>My profile <UserRound size={16}/></button>
           <button onClick={() => { setShowSubscriptions(true); setMenuOpen(false); }}>Verification subscription <BadgeCheck size={16}/></button>
           <button onClick={() => { setShowCart(true); setMenuOpen(false); }}>Shopping cart ({cart.length}) <ShoppingCart size={16}/></button>
@@ -572,7 +583,7 @@ export default function App() {
             </button>
           )}
           <button onClick={() => setDarkMode(v => !v)} aria-label={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}>{darkMode ? 'Switch to light mode' : 'Switch to dark mode'} {darkMode ? <Sun size={16}/> : <Moon size={16}/>}</button>
-          {(user?.email||'').toLowerCase()==='princewillobongha@gmail.com' && <button onClick={() => { void openAdmin(); setMenuOpen(false); }}>Admin verification <ShieldCheck size={16}/></button>}{user&&<button onClick={()=>void signOut()}>Sign out <LogIn size={16}/></button>}
+          {(user?.email||'').toLowerCase()==='princewillobongha@gmail.com' && <button onClick={() => { void openAdmin(); setMenuOpen(false); }}>Admin verification <ShieldCheck size={16}/></button>}{user&&<button className="sign-out-link" onClick={()=>{setMenuOpen(false);void signOut();}}>Sign out <LogIn size={16}/></button>}
         </div>
       )}
       <div className="page-wrap">
@@ -603,7 +614,7 @@ export default function App() {
               </button>
             );
           })}
-          <button className={`nav-item ${active === 'Search' ? 'active' : ''}`} onClick={() => { setActive('Search'); setPeopleQuery(''); void api.get('/api/people').then(r=>setPeople(r.data?.items||[])).catch(()=>setNotice('Could not load members. Please try again.')); }}>
+          <button className={`nav-item ${active === 'Search' ? 'active' : ''}`} onClick={() => { setActive('Search'); setPeopleQuery(''); void api.get('/api/people').then(r=>setPeople(shuffleList(r.data?.items||[]))).catch(()=>setNotice('Could not load members. Please try again.')); }}>
             <Search size={18}/><span>Search</span>
           </button>
           <div className="side-divider" />
@@ -824,7 +835,7 @@ export default function App() {
                   </div>
                 </div>
                 <div className="category-grid explore-city-grid">
-                  <button className="category-card" onClick={()=>{setPeopleQuery('');setActive('Search');void api.get('/api/people').then(r=>setPeople(r.data?.items||[])).catch(()=>setNotice('Could not load members. Please try again.'));}}>
+                  <button className="category-card" onClick={()=>{setPeopleQuery('');setActive('Search');void api.get('/api/people').then(r=>setPeople(shuffleList(r.data?.items||[]))).catch(()=>setNotice('Could not load members. Please try again.'));}}>
                     <span className="category-icon blue"><Users size={22}/></span><b>People</b><span>Follow members and add friends <ArrowUpRight size={14}/></span>
                   </button>
                   <button className="category-card" onClick={()=>setActive('Groups')}>
@@ -1244,13 +1255,14 @@ export default function App() {
           <button
             key={n}
             className={active === n ? 'selected' : ''}
-            onClick={() => { setActive(n); if(n==='Search'){setPeopleQuery('');void api.get('/api/people').then(r=>setPeople(r.data?.items||[])).catch(()=>setNotice('Could not load members. Please try again.'));} }}
+            onClick={() => { setActive(n); if(n==='Search'){setPeopleQuery('');void api.get('/api/people').then(r=>setPeople(shuffleList(r.data?.items||[]))).catch(()=>setNotice('Could not load members. Please try again.'));} }}
           >
             <Icon size={20} />
             <span>{n}</span>
           </button>
         ))}
       </nav>
+      {showAbout && <div className="modal-backdrop" onClick={() => setShowAbout(false)}><div className="modal form-modal about-modal" onClick={e => e.stopPropagation()}><button className="modal-close" onClick={() => setShowAbout(false)}><X size={18}/></button><div className="eyebrow muted">ABOUT US</div><h2>Calabar Connect City</h2><p>Calabar Connect City brings people, local businesses, community conversations, groups, jobs and marketplace discoveries together in Calabar, Cross River State.</p><p>Our goal is to make it easier for residents to discover trusted local services, connect with neighbours and share useful community updates.</p><button className="primary-btn full-btn" onClick={() => setShowAbout(false)}>Back to Calabar Connect City</button></div></div>}
       {showAuth && (
         <div className="modal-backdrop" onClick={() => setShowAuth(false)}>
           <div className="modal auth-modal" onClick={e => e.stopPropagation()}>
@@ -1469,17 +1481,12 @@ export default function App() {
         <button onClick={()=>{if(!user){setShowAuth(true);return;}void openPublicProfile(user?.userId||user?.id);}}><UserRound size={19}/><span>Profile</span></button>
       </nav>
       <footer className="site-footer">
-        <span>© 2026 Calabar Connect City</span>
-        <span>Built for local discovery in Calabar, Cross River State.</span>
-        <button
-          onClick={() =>
-            setNotice(
-              'Safety first: report suspicious listings and never share your passwords or one-time codes.'
-            )
-          }
-        >
-          Safety & trust
-        </button>
+        <div className="site-footer-copy"><span>© 2026 Calabar Connect City</span><span>Built for local discovery in Calabar, Cross River State.</span></div>
+        <nav className="site-footer-links" aria-label="About and contact">
+          <button type="button" onClick={() => setShowAbout(true)}>About</button>
+          <a href="mailto:Princewillobongha@gmail.com">Contact</a>
+          <button type="button" onClick={() => setNotice('Safety first: report suspicious listings and never share your passwords or one-time codes.')}>Safety & trust</button>
+        </nav>
       </footer>
     </div>
   );
