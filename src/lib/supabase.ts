@@ -333,7 +333,9 @@ async function post(path: string, body: any) {
     const {error}=await supabase.from('community_post_reactions').insert({post_id:postId,user_id:user.id});if(error)fail(error.message);
     const {data:post}=await supabase.from('community_posts').select('author_id').eq('id',postId).maybeSingle();
     if(post?.author_id && post.author_id!==user.id){
-      await supabase.from('notifications').insert({user_id:post.author_id,actor_id:user.id,kind:'post_like',title:'Someone liked your post',body:profileName(user)+' liked your community post.',target_url:'post://'+postId});
+      const {data:actor}=await supabase.from('profiles').select('display_name,username').eq('id',user.id).maybeSingle();
+      const actorName=actor?.display_name||actor?.username||profileName(user);
+      await supabase.from('notifications').insert({user_id:post.author_id,actor_id:user.id,kind:'post_like',title:'New like on your post',body:actorName+' liked your community post.',target_url:'post://'+postId});
     }
     return {data:{liked:true}};
   }
