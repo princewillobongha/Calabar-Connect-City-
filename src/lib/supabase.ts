@@ -388,7 +388,7 @@ async function post(path: string, body: any) {
     if(error) fail(error.message);return {data:{ok:true}};
   }
   if(path==='/api/reports'){
-    const {data,error}=await supabase.from('moderation_reports').insert({reporter_id:user.id,target_type:body.target_type||'community_content',target_id:body.target_id||null,reason:body.reason,details:body.details||''}).select('*').single();
+    const {data,error}=await supabase.from('moderation_reports').insert({reporter_id:user.id,target_type:body.target_type||'community_content',target_id:body.target_id||null,reason:body.reason,details:body.details||'',status:'open'}).select('*').single();
     return {data:{item:ensure(data,error)}};
   }
   fail('Unsupported API route: '+path);
