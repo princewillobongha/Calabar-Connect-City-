@@ -3,6 +3,14 @@ import { createRoot } from 'react-dom/client';
 import App from './App';
 import './index.css';
 
+if ('serviceWorker' in navigator && import.meta.env.PROD) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(error => {
+      console.warn('Calabar Connect City offline support could not be enabled:', error);
+    });
+  });
+}
+
 class AppErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   state: { error: Error | null } = { error: null };
 
