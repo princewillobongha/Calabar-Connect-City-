@@ -24,7 +24,6 @@ import {
   Bookmark,
   UserRound,
   BadgeCheck,
-  Star,
 } from 'lucide-react';
 
 type Listing = {
