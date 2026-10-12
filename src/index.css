@@ -1245,22 +1245,32 @@ select:focus-visible {
 .empty-state .primary-btn {
   margin-top: 12px;
 }
-.site-footer {
+ .site-footer {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
   border-top: 1px solid #e7e9e2;
   padding: 20px 4.2%;
   font-size: 10px;
   color: #a0a89e;
 }
-.site-footer button {
+.site-footer-copy { display: grid; gap: 5px; }
+.site-footer-links { display: flex; align-items: center; flex-wrap: wrap; gap: 16px; }
+.site-footer button, .site-footer a {
   border: 0;
   background: none;
   color: #648365;
-  font-size: 10px;
+  font-size: 11px;
+  font-weight: 700;
+  text-decoration: none;
+  padding: 5px 0;
 }
+.site-footer a:hover, .site-footer button:hover { color: #315f3b; text-decoration: underline; }
+.about-modal p { color: #536257; line-height: 1.75; font-size: 13px; }
+.menu-notification-count { display: inline-flex; align-items: center; justify-content: center; min-width: 22px; min-height: 22px; padding: 0 6px; border-radius: 999px; background: #e7f0e5; color: #315f3b; font-size: 10px; font-weight: 800; }
+.mobile-panel .sign-out-link { margin-top: 5px; padding-top: 15px; border-top: 1px solid #e6e9e2; color: #315f3b; font-weight: 800; }
+
 .modal-backdrop {
   position: fixed;
   inset: 0;
@@ -2185,12 +2195,15 @@ html.dark-mode .comment-sort,html.dark-mode .comment-sort select { color:#d8e4da
 /* Calabar Connect City: reachable mobile menu, pinned posts, notifications and announcements */
 @media (max-width: 760px) {
   .mobile-panel {
-    max-height: calc(100dvh - 84px);
-    overflow-y: auto;
-    overscroll-behavior: contain;
+    height: auto;
+    min-height: 0;
+    max-height: calc(100dvh - 84px - env(safe-area-inset-bottom));
+    overflow-y: scroll;
+    overscroll-behavior-y: contain;
     -webkit-overflow-scrolling: touch;
     touch-action: pan-y;
-    padding-bottom: max(10px, env(safe-area-inset-bottom));
+    align-items: stretch;
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
   }
   .mobile-panel > button { flex: 0 0 auto; min-height: 44px; }
 }
