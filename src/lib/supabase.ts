@@ -183,12 +183,6 @@ async function get(path: string) {
     return {data:{items:rows.map((p:any)=>{const a:any=pm.get(p.author_id)||{};return {id:p.id,text:p.text,image_url:p.image_url||null,author:a.display_name||a.username||'Calabar Member',author_id:p.author_id,is_verified:!!a.is_verified&&(!a.verified_until||new Date(a.verified_until).getTime()>Date.now()),avatar_url:a.avatar_url||null,category:p.category,created_at:p.created_at,like_count:(likes||[]).filter((x:any)=>x.post_id===p.id).length,liked_by_me:!!viewer&&(likes||[]).some((x:any)=>x.post_id===p.id&&x.user_id===viewer.id),share_count:(shares||[]).filter((x:any)=>x.post_id===p.id).length,shared_by_me:!!viewer&&(shares||[]).some((x:any)=>x.post_id===p.id&&x.user_id===viewer.id),comment_count:(comments||[]).filter((x:any)=>x.post_id===p.id).length}})}};
   }
   const user=await currentUser();
-  if (path === '/api/messages') {
-    const {data:convos,error:ce}=await supabase.from('conversations').select('id,user_a,user_b').or('user_a.eq.'+user.id+',user_b.eq.'+user.id);
-    const rows=ensure(convos,ce)||[]; if(!rows.length)return {data:{items:[]}};
-    const {data,error}=await supabase.from('messages').select('*, sender:profiles!messages_sender_id_fkey(display_name)').in('conversation_id',rows.map((x:any)=>x.id)).order('created_at',{ascending:true}).limit(300);
-    return {data:{items:ensure(data,error).map((m:any)=>{const c=rows.find((x:any)=>x.id===m.conversation_id);return {...m,text:m.body,sender_id:m.sender_id,sender_name:m.sender?.display_name||'Member',recipient_id:c?.user_a===user.id?c?.user_b:c?.user_a,read:!!m.read_at};})}};
-  }
   if (path === '/api/friends') {
     const {data,error}=await supabase.from('friend_requests').select('*, sender:profiles!friend_requests_sender_id_fkey(display_name,username), receiver:profiles!friend_requests_receiver_id_fkey(display_name,username)').or('sender_id.eq.'+user.id+',receiver_id.eq.'+user.id).order('created_at',{ascending:false});
     return {data:{items:ensure(data,error).map((x:any)=>({id:x.id,from_id:x.sender_id,to_id:x.receiver_id,from_name:x.sender?.display_name||x.sender?.username||'Member',to_name:x.receiver?.display_name||x.receiver?.username||'Member',status:x.status,created_at:x.created_at}))}};
@@ -356,18 +350,6 @@ async function post(path: string, body: any) {
     if(existing){const {error}=await supabase.from('group_members').update({status:'active',role:'member'}).eq('group_id',id).eq('user_id',user.id);if(error)fail(error.message);return {data:{ok:true,reactivated:true}};}
     const {error}=await supabase.from('group_members').insert({group_id:id,user_id:user.id,role:'member',status:'active'});
     if(error) fail(error.message);return {data:{ok:true}};
-  }
-  if(path==='/api/messages'){
-    const recipient=String(body.recipient_id||'').trim();
-    if(!recipient||recipient===user.id) fail('Choose another member ID.');
-    const [a,b]=[user.id,recipient].sort();
-    let {data:conversation,error:ce}=await supabase.from('conversations').select('*').eq('user_a',a).eq('user_b',b).maybeSingle();
-    if(ce) fail(ce.message);
-    if(!conversation){const {data,error}=await supabase.from('conversations').insert({user_a:a,user_b:b}).select('*').single();conversation=ensure(data,error);}
-    const {data,error}=await supabase.from('messages').insert({conversation_id:conversation.id,sender_id:user.id,body:body.text}).select('*').single();
-    const m=ensure(data,error);
-    await supabase.from('notifications').insert({user_id:recipient,actor_id:user.id,kind:'message',title:'New message',body:'You received a new community message.'});
-    return {data:{item:{...m,text:m.body,sender_id:user.id,sender_name:profileName(user),recipient_id:recipient,read:false}}};
   }
   if(path==='/api/friends/request'){
     const to=String(body.to_id||'').trim(); if(!to||to===user.id) fail('Choose another member.');
