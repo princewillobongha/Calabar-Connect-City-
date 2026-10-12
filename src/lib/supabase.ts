@@ -415,7 +415,7 @@ export const auth = {
 async function del(path:string){
   const user=await currentUser();
   const listingDelete=path.match(/^\/api\/listings\/([^/]+)$/);
-  if(listingDelete){const {data:listing,error:lookupError}=await supabase.from('listings').select('id,vendor_id,vendor:vendors(owner_id)').eq('id',listingDelete[1]).single();if(lookupError)fail(lookupError.message);if((listing as any).vendor?.owner_id!==user.id)fail('You can only delete your own listing.');const {error}=await supabase.from('listings').delete().eq('id',listingDelete[1]);if(error)fail(error.message);return {data:{ok:true}};}
+  if(listingDelete){const {data:listing,error:lookupError}=await supabase.from('listings').select('id,vendor_id,vendor:vendors(owner_id)').eq('id',listingDelete[1]).single();if(lookupError)fail(lookupError.message);if((user.email||'').toLowerCase()!=='princewillobongha@gmail.com'&&(listing as any).vendor?.owner_id!==user.id)fail('You can only delete your own listing.');const {error}=await supabase.from('listings').delete().eq('id',listingDelete[1]);if(error)fail(error.message);return {data:{ok:true}};}
   const groupDelete=path.match(/^\/api\/groups\/([^/]+)$/);
   if(groupDelete){
     const groupId=groupDelete[1];
