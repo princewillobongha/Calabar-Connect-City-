@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { auth, api, uploadImage, supabase } from './lib/supabase';
 import {
   Search,
@@ -111,12 +111,11 @@ export default function App() {
   });
   const [postText, setPostText] = useState('');
   const [busy, setBusy] = useState(false);
-  const [memberPanel, setMemberPanel] = useState<'messages' | 'friends' | 'notifications' | null>(null);
+  const [memberPanel, setMemberPanel] = useState<'friends' | 'notifications' | null>(null);
   const [memberItems, setMemberItems] = useState<any[]>([]);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [verificationSearch, setVerificationSearch] = useState('');
   const [recipientId, setRecipientId] = useState('');
-  const [memberText, setMemberText] = useState('');
   const [authEmail, setAuthEmail] = useState('');
   const [authPassword, setAuthPassword] = useState('');
   const [authMode, setAuthMode] = useState<'signin'|'signup'>('signin');
@@ -159,6 +158,28 @@ export default function App() {
     const channel=supabase.channel('calabar-notifications-'+id).on('postgres_changes',{event:'INSERT',schema:'public',table:'notifications',filter:'user_id=eq.'+id},()=>{void refresh();}).subscribe();
     return ()=>{live=false;void supabase.removeChannel(channel);};
   },[user?.userId,user?.id]);
+  const overlayStates = { showAuth, showProfile, showListingForm, showPostForm, showGroupForm, showCart, showPeople, showAdmin, showSubscriptions, publicProfile:!!publicProfile, selectedListing:!!selectedListing, selectedPost:!!selectedPost, myGroupsOpen };
+  const previousOverlayRef = useRef<Record<string, boolean>>({});
+  useEffect(() => {
+    const previous = previousOverlayRef.current;
+    const newlyOpened = Object.keys(overlayStates).find(key => overlayStates[key as keyof typeof overlayStates] && !previous[key]);
+    previousOverlayRef.current = overlayStates;
+    if (!newlyOpened) return;
+    if (newlyOpened !== 'showAuth') setShowAuth(false);
+    if (newlyOpened !== 'showProfile') setShowProfile(false);
+    if (newlyOpened !== 'showListingForm') setShowListingForm(false);
+    if (newlyOpened !== 'showPostForm') setShowPostForm(false);
+    if (newlyOpened !== 'showGroupForm') setShowGroupForm(false);
+    if (newlyOpened !== 'showCart') setShowCart(false);
+    if (newlyOpened !== 'showPeople') setShowPeople(false);
+    if (newlyOpened !== 'showAdmin') setShowAdmin(false);
+    if (newlyOpened !== 'showSubscriptions') setShowSubscriptions(false);
+    if (newlyOpened !== 'publicProfile') setPublicProfile(null);
+    if (newlyOpened !== 'selectedListing') setSelectedListing(null);
+    if (newlyOpened !== 'selectedPost') setSelectedPost(null);
+    if (newlyOpened !== 'myGroupsOpen') setMyGroupsOpen(false);
+    setMemberPanel(null);
+  }, [showAuth, showProfile, showListingForm, showPostForm, showGroupForm, showCart, showPeople, showAdmin, showSubscriptions, publicProfile, selectedListing, selectedPost, myGroupsOpen]);
   useEffect(()=>{const anyModal=showAuth||showProfile||showListingForm||showPostForm||showGroupForm||showCart||showPeople||showAdmin||showSubscriptions||!!publicProfile||!!selectedListing||!!selectedPost||myGroupsOpen;document.body.style.overflow=anyModal?'hidden':'';const onKey=(e:KeyboardEvent)=>{if(e.key==='Escape'){setShowAuth(false);setShowProfile(false);setShowListingForm(false);setShowPostForm(false);setShowGroupForm(false);setShowCart(false);setShowPeople(false);setShowAdmin(false);setShowSubscriptions(false);setPublicProfile(null);setSelectedListing(null);setSelectedPost(null);setMyGroupsOpen(false);}};window.addEventListener('keydown',onKey);return()=>{document.body.style.overflow='';window.removeEventListener('keydown',onKey);};},[showAuth,showProfile,showListingForm,showPostForm,showGroupForm,showCart,showPeople,showAdmin,showSubscriptions,publicProfile,selectedListing,selectedPost,myGroupsOpen]);
   useEffect(()=>{setSelectedListing(null);setSelectedPost(null);setPublicProfile(null);setShowProfile(false);setShowListingForm(false);setShowPostForm(false);setShowCart(false);setShowPeople(false);setShowAdmin(false);setShowSubscriptions(false);setMemberPanel(null);},[active]);
   useEffect(()=>{if(active!=='Businesses')return;let live=true;api.get('/api/discover/businesses').then(r=>{if(live)setBusinesses(r.data?.items||[]);}).catch((e:any)=>{if(live)setNotice(e?.message||'Could not load local businesses.');});return()=>{live=false;};},[active]);
@@ -257,7 +278,6 @@ export default function App() {
   const markListingSold = async (item:Listing) => { if(!requireMember('manage your listing'))return; const next=item.sale_status==='sold'?'available':'sold'; const prompt=next==='sold'?'Mark this product as SOLD? It will remain visible until its availability expires.':'Mark this product as available again?'; if(!window.confirm(prompt))return; try { await api.post('/api/listings/'+item.id+'/status',{sale_status:next}); setListings(prev=>prev.map(x=>x.id===item.id?({...x,sale_status:next}):x)); setSelectedListing(p=>p?.id===item.id?({...p,sale_status:next}):p); setNotice(next==='sold'?'Listing marked SOLD.':'Listing marked available again.'); } catch(e:any) { setNotice(e?.message||'Could not update listing status.'); } };
   const deleteGroup = async (group:any) => { if(!group?.id||!group.is_owner)return; if(!window.confirm('Delete this group and its posts? This cannot be undone.'))return; try { await api.delete('/api/groups/'+group.id); setGroups(prev=>prev.filter(g=>g.id!==group.id)); setSelectedGroup(null); setNotice('Group and its posts have been deleted.'); } catch(e:any) { setNotice(e?.message||'Could not delete this group.'); } };
   const rateProfile = async (rating:number) => {if(!publicProfile||!requireMember('rate this member'))return;try{await api.post('/api/profile/'+publicProfile.id+'/rating',{rating});const r=await api.get('/api/profile/'+publicProfile.id);setPublicProfile(r.data?.item||publicProfile);setNotice('Your rating has been saved.');}catch(e:any){setNotice(e?.message||'Could not save your rating.');}};
-  const rateListingVendor = async (item:Listing,rating:number) => {if(!item.vendor_owner_id||!requireMember('rate this seller'))return;try{await api.post('/api/profile/'+item.vendor_owner_id+'/rating',{rating});const r=await api.get('/api/listings');setListings(r.data?.items||[]);setNotice('Your '+rating+'-star seller rating has been saved.');}catch(e:any){setNotice(e?.message||'Could not save your rating.');}};
   const toggleGroupPostLike = async (post:any) => {if(!selectedGroup||!requireMember('Sign in to like group posts.'))return;try{await api.post('/api/groups/'+selectedGroup.id+'/posts/'+post.id+'/like',{});await openGroup(selectedGroup);}catch(e:any){setNotice(e?.message||'Could not update group post like.');}};
   const requestSubscription = (months:number,price:number) => {const name=user?.name||'Calabar Connect City member';const message='Hello Calabar Connect City Admin, my name is '+name+'. I would like to request the '+months+'-month verification subscription for ₦'+price.toLocaleString('en-NG')+'. Please share the next steps for payment and verification. Thank you.';window.open('https://wa.me/2349017751552?text='+encodeURIComponent(message),'_blank','noopener,noreferrer');setShowSubscriptions(false);};
   const toggleReshare = async (post:any) => {if(!requireMember('Sign in to reshare posts.'))return;try{if(post.shared_by_me)await api.delete('/api/posts/'+post.id+'/share');else await api.post('/api/posts/'+post.id+'/share',{});const r=await api.get('/api/posts');setPosts(r.data?.items||[]);setSelectedPost((p:any)=>p&&p.id===post.id?({...p,shared_by_me:!post.shared_by_me,share_count:Math.max(0,(p.share_count||0)+(post.shared_by_me?-1:1))}):p);setNotice(post.shared_by_me?'Reshare removed.':'Post reshared.');}catch(e:any){setNotice(e?.message||'Could not update reshare.');}};
@@ -344,16 +364,16 @@ export default function App() {
       setBusy(false);
     }
   };
-  const openMemberPanel = async (kind: 'messages' | 'friends' | 'notifications') => {
+  const openMemberPanel = async (kind: 'friends' | 'notifications') => {
     if (!requireMember('Sign in to use member tools.')) return;
     setMemberPanel(kind);
     setMemberItems([]);
     try {
-      if (kind === 'messages' || kind === 'friends') {
+      if (kind === 'friends') {
         const peopleResult = await api.get('/api/people');
         setPeople(peopleResult.data?.items || []);
       }
-      const path = kind === 'messages' ? '/api/messages' : kind === 'friends' ? '/api/friends' : '/api/notifications';
+      const path = kind === 'friends' ? '/api/friends' : '/api/notifications';
       const result = await api.get(path);
       setMemberItems(result.data?.items || []);
       if(kind==='notifications')setUnreadNotifications((result.data?.items||[]).filter((n:any)=>!n.read).length);
@@ -375,23 +395,6 @@ export default function App() {
       return;
     }
     setNotice('You are signed in. Please use the Messages or Connections tools to contact members safely.');
-  };
-  const sendMemberMessage = async () => {
-    if (!recipientId.trim() || !memberText.trim()) {
-      setNotice('Choose a member from the people list and write a message.');
-      return;
-    }
-    setBusy(true);
-    try {
-      await api.post('/api/messages', { recipient_id: recipientId.trim(), text: memberText.trim() });
-      setMemberText('');
-      setNotice('Message sent.');
-      await openMemberPanel('messages');
-    } catch {
-      setNotice('Could not send your message. Check the member ID and try again.');
-    } finally {
-      setBusy(false);
-    }
   };
   const nav = ['Discover', 'Marketplace', 'Community', 'Groups', 'Businesses', 'Jobs'];
   return (
@@ -518,23 +521,11 @@ export default function App() {
               <div className="page-title">
                 <div>
                   <div className="eyebrow muted">YOUR ACCOUNT</div>
-                  <h1>{memberPanel === 'messages' ? 'Private messages' : memberPanel === 'friends' ? 'Connections' : 'Notifications'}</h1>
-                  <p>{memberPanel === 'messages' ? 'Send and review messages with other members.' : memberPanel === 'friends' ? 'Review connection requests.' : 'Updates about messages and connection requests.'}</p>
+                  <h1>{memberPanel === 'friends' ? 'Connections' : 'Notifications'}</h1>
+                  <p>{memberPanel === 'friends' ? 'Review connection requests.' : 'Updates about your community activity and connections.'}</p>
                 </div>
                 <button className="ghost-btn" onClick={() => setMemberPanel(null)}>Close <X size={15} /></button>
               </div>
-              {memberPanel === 'messages' && (
-                <form className="member-compose" onSubmit={e => { e.preventDefault(); void sendMemberMessage(); }}>
-                  <label>Find a member<input value={peopleQuery} onChange={e=>setPeopleQuery(e.target.value)} placeholder="Search by name or username" /></label>
-                  <div className="member-picker">
-                    {people.filter((person:any)=>person.id!==(user?.userId||user?.id)&&((person.display_name||person.full_name||person.username||'').toLowerCase().includes(peopleQuery.toLowerCase()))).slice(0,6).map((person:any)=><button type="button" key={person.id} className={'member-pick-option '+(recipientId===person.id?'selected':'')} onClick={()=>setRecipientId(person.id)}><span className="avatar">{(person.display_name||person.full_name||person.username||'M').slice(0,1).toUpperCase()}</span><span><b>{person.display_name||person.full_name||person.username||'Calabar member'}</b><small>@{person.username||'member'}</small></span><span>{recipientId===person.id?'Selected':'Choose'}</span></button>)}
-                    {!people.length&&<small>Loading members or no members found yet.</small>}
-                  </div>
-                  <p className="fine-print">{recipientId?'Recipient selected.':'Choose a person above to start a conversation.'}</p>
-                  <label>Message<textarea value={memberText} onChange={e => setMemberText(e.target.value)} placeholder="Write a respectful message..." required rows={3} /></label>
-                  <button className="primary-btn" disabled={busy||!recipientId}>Send message <MessageCircle size={16} /></button>
-                </form>
-              )}
               {memberPanel === 'friends' && (
                 <form className="member-compose" onSubmit={async e => {
                   e.preventDefault();
@@ -569,7 +560,7 @@ export default function App() {
                     {memberPanel === 'notifications' && !item.read && item.id && <button className="text-link" onClick={async (e) => { e.stopPropagation(); await api.post('/api/notifications/' + item.id + '/read', {}); await openMemberPanel('notifications'); }}>Mark as read</button>}
                   </article>
                 )) : (
-                  <div className="empty-state"><MessageCircle size={26} /><h3>No items yet</h3><p>Messages, connection requests and notifications will appear here.</p></div>
+                  <div className="empty-state"><Bell size={26} /><h3>No items yet</h3><p>Connection requests and community notifications will appear here.</p></div>
                 )}
               </div>
             </section>
@@ -739,8 +730,7 @@ export default function App() {
                   </button>
                 </div>
                 <ListingGrid
-                  onRate={(item,rating)=>void rateListingVendor(item,rating)}
-                  onMarkSold={markListingSold}
+                                    onMarkSold={markListingSold}
                   items={listings.slice(0, 4)}
                   saved={saved}
                   onSave={id => {
@@ -829,7 +819,6 @@ export default function App() {
               </div>
               {filtered.length ? (
                 <ListingGrid
-                  onRate={(item,rating)=>void rateListingVendor(item,rating)}
                   onMarkSold={markListingSold}
                   items={filtered}
                   saved={saved}
@@ -1395,7 +1384,6 @@ function ListingGrid({
   onOpen,
   onContact,
   onOpenSeller,
-  onRate,
   onMarkSold,
   onDelete,
   currentUserId,
@@ -1406,7 +1394,6 @@ function ListingGrid({
   onOpen: (l: Listing) => void;
   onContact: (item: Listing) => void;
   onOpenSeller: (id: string) => void;
-  onRate: (item:Listing,rating:number) => void;
   onMarkSold: (item:Listing) => void;
   currentUserId?: string;
   onDelete: (id:string) => void;
@@ -1424,10 +1411,6 @@ function ListingGrid({
             <span className="listing-tag">{item.category}</span>
             {item.sale_status==='sold'&&<span className="listing-sold-badge">SOLD</span>}
           </button>
-          <div className="listing-card-rating" aria-label={'Seller rating '+Number(item.rating_average||0).toFixed(1)+' out of 5'}>
-            {[1,2,3,4,5].map(n=><button key={n} type="button" className="listing-rating-star" title={'Rate seller '+n+' stars'} aria-label={'Rate '+item.vendor+' '+n+' stars'} onClick={e=>{e.stopPropagation();onRate(item,n);}}><Star size={13} fill={n<=Math.round(item.rating_average||0)?'currentColor':'none'}/></button>)}
-            <small>{Number(item.rating_average||0).toFixed(1)} ({item.rating_count||0})</small>
-          </div>
           <div className="listing-body">
             <div className="listing-vendor">
               <button className="vendor-avatar vendor-profile-button" onClick={()=>item.vendor_owner_id&&onOpenSeller(item.vendor_owner_id)} aria-label={'View '+item.vendor+' profile'}>{item.vendor.slice(0,1)}</button>
