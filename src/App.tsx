@@ -743,6 +743,7 @@ export default function App() {
                   onOpen={setSelectedListing}
                   onContact={contactSeller}
                   currentUserId={user?.userId||user?.id}
+                  isAdmin={(user?.email||'').toLowerCase()==='princewillobongha@gmail.com'}
                   onDelete={deleteListing}
                   onOpenSeller={id=>void openPublicProfile(id)}
                 />
@@ -1397,6 +1398,7 @@ function ListingGrid({
   onOpenSeller: (id: string) => void;
   onMarkSold: (item:Listing) => void;
   currentUserId?: string;
+  isAdmin?: boolean;
   onDelete: (id:string) => void;
 }) {
   return (
@@ -1430,7 +1432,7 @@ function ListingGrid({
             <small className="listing-order-count">{item.order_count||0} order enquiries</small>
             <div className="listing-bottom">
               <b>{money(item.price)}</b>
-              <div className="listing-actions"><button className="listing-contact-button" disabled={item.sale_status==='sold'} onClick={() => onContact(item)} aria-label="Contact seller">{item.sale_status==='sold'?'Sold':<MessageCircle size={16}/>}</button>{item.vendor_owner_id===currentUserId&&<><button className="listing-status-button" onClick={()=>void onMarkSold(item)} aria-label={item.sale_status==='sold'?'Mark available':'Mark sold'}>{item.sale_status==='sold'?'Mark available':'Mark sold'}</button><button className="listing-delete-button" onClick={()=>onDelete(item.id)} aria-label="Delete my listing" title="Delete listing"><X size={16}/></button></>}</div>
+              <div className="listing-actions"><button className="listing-contact-button" disabled={item.sale_status==='sold'} onClick={() => onContact(item)} aria-label="Contact seller">{item.sale_status==='sold'?'Sold':<MessageCircle size={16}/>}</button>{(item.vendor_owner_id===currentUserId||isAdmin)&&<>{item.vendor_owner_id===currentUserId&&<button className="listing-status-button" onClick={()=>void onMarkSold(item)} aria-label={item.sale_status==='sold'?'Mark available':'Mark sold'}>{item.sale_status==='sold'?'Mark available':'Mark sold'}</button>}<button className="listing-delete-button" onClick={()=>onDelete(item.id)} aria-label={isAdmin?'Admin delete listing':'Delete my listing'} title={isAdmin?'Admin delete listing':'Delete listing'}><X size={16}/></button></>}</div>
             </div>
           </div>
         </article>
