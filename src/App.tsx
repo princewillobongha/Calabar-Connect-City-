@@ -412,8 +412,9 @@ export default function App() {
             className="icon-btn notification"
             aria-label="Notifications"
             onClick={() => void openMemberPanel('notifications')}
+            title="Notifications"
           >
-            <Bell size={19} />{unreadNotifications>0&&<span className="notification-count">{unreadNotifications>99?'99+':unreadNotifications}</span>}
+            <Bell size={19} /><span className="notification-label">Notifications</span>{unreadNotifications>0&&<span className="notification-count">{unreadNotifications>99?'99+':unreadNotifications}</span>}
           </button>
           {(user?.email||'').toLowerCase()==='princewillobongha@gmail.com' && <button className="icon-btn" aria-label="Admin verification" onClick={()=>void openAdmin()}><ShieldCheck size={19}/></button>}
           {user ? (
