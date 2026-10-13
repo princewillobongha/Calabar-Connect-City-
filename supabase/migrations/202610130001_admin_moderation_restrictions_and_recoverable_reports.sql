@@ -15,6 +15,7 @@ create index if not exists member_restrictions_active_user_idx
   on public.member_restrictions(user_id, restriction_type, expires_at)
   where deleted_at is null;
 alter table public.member_restrictions enable row level security;
+grant select, insert, update, delete on public.member_restrictions to authenticated;
 drop policy if exists "members can view own restrictions" on public.member_restrictions;
 create policy "members can view own restrictions" on public.member_restrictions
   for select to authenticated using (user_id = (select auth.uid()));
@@ -53,6 +54,7 @@ create policy "members create community posts unless restricted" on public.commu
   );
 
 drop policy if exists "Members can create group posts" on public.community_group_posts;
+drop policy if exists "members create group posts unless restricted" on public.community_group_posts;
 create policy "members create group posts unless restricted" on public.community_group_posts
   for insert to authenticated
   with check (
@@ -76,6 +78,7 @@ create policy "members create group posts unless restricted" on public.community
   );
 
 drop policy if exists "vendor owners add listings" on public.listings;
+drop policy if exists "vendor owners add listings unless restricted" on public.listings;
 create policy "vendor owners add listings unless restricted" on public.listings
   for insert to authenticated
   with check (
