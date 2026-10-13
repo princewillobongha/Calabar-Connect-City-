@@ -219,13 +219,56 @@ async function get(path: string) {
     const {data,error}=await supabase.from('profiles').select('id,username,display_name,avatar_url,is_verified,verified_until,verified_days').order('created_at',{ascending:false}).limit(500);
     return {data:{items:ensure(data,error).map((p:any)=>({...p,is_verified:!!p.is_verified&&(!p.verified_until||new Date(p.verified_until).getTime()>Date.now())}))}};
   }
+  if (path === '/api/restrictions/mine') {
+    const {data,error}=await supabase.from('member_restrictions').select('id,restriction_type,reason,expires_at,created_at').eq('user_id',user.id).is('deleted_at',null);
+    const rows=ensure(data,error);
+    return {data:{items:rows.filter((r:any)=>!r.expires_at||new Date(r.expires_at).getTime()>Date.now())}};
+  }
+  if (path.startsWith('/api/admin/restrictions')) {
+    if ((user.email||'').toLowerCase() !== 'princewillobongha@gmail.com') fail('Admin access required.');
+    const userId = new URLSearchParams(path.split('?')[1] || '').get('user_id');
+    let query = supabase.from('member_restrictions').select('*').is('deleted_at', null).order('created_at', {ascending:false});
+    if (userId) query = query.eq('user_id', userId);
+    const {data,error}=await query.limit(300);
+    const rows=ensure(data,error);
+    return {data:{items:rows.filter((r:any)=>!r.expires_at||new Date(r.expires_at).getTime()>Date.now())}};
+  }
   if (path === '/api/admin/reports') {
     if ((user.email||'').toLowerCase() !== 'princewillobongha@gmail.com') fail('Admin access required.');
     const {data,error}=await supabase.from('moderation_reports').select('*').order('created_at',{ascending:false}).limit(300);
-    const rows=ensure(data,error), ids=[...new Set(rows.map((x:any)=>x.reporter_id).filter(Boolean))];
-    const {data:profiles,error:pe}=ids.length?await supabase.from('profiles').select('id,username,display_name,avatar_url').in('id',ids):{data:[],error:null};if(pe)fail(pe.message);
-    const pm=new Map((profiles||[]).map((p:any)=>[p.id,p]));
-    return {data:{items:rows.map((x:any)=>({...x,reporter:pm.get(x.reporter_id)||null,reporter_name:(pm.get(x.reporter_id) as any)?.display_name||(pm.get(x.reporter_id) as any)?.username||'Unknown member'}))}};
+    const rows=ensure(data,error);
+    const reporterIds=[...new Set(rows.map((x:any)=>x.reporter_id).filter(Boolean))];
+    const profileTargetIds=rows.filter((x:any)=>x.target_type==='profile').map((x:any)=>x.target_id).filter(Boolean);
+    const communityIds=rows.filter((x:any)=>x.target_type==='community_post').map((x:any)=>x.target_id).filter(Boolean);
+    const groupIds=rows.filter((x:any)=>x.target_type==='group_post').map((x:any)=>x.target_id).filter(Boolean);
+    const listingIds=rows.filter((x:any)=>x.target_type==='marketplace_listing').map((x:any)=>x.target_id).filter(Boolean);
+    const [reporters,profileTargets,communityTargets,groupTargets,listingTargets]=await Promise.all([
+      reporterIds.length?supabase.from('profiles').select('id,username,display_name,avatar_url').in('id',reporterIds):Promise.resolve({data:[],error:null}),
+      profileTargetIds.length?supabase.from('profiles').select('id,username,display_name,avatar_url').in('id',profileTargetIds):Promise.resolve({data:[],error:null}),
+      communityIds.length?supabase.from('community_posts').select('id,author_id,text').in('id',communityIds):Promise.resolve({data:[],error:null}),
+      groupIds.length?supabase.from('community_group_posts').select('id,author_id,text,group_id,group:community_groups(name)').in('id',groupIds):Promise.resolve({data:[],error:null}),
+      listingIds.length?supabase.from('listings').select('id,title,description,vendor:vendors(owner_id,business_name)').in('id',listingIds):Promise.resolve({data:[],error:null})
+    ]);
+    for(const q of [reporters,profileTargets,communityTargets,groupTargets,listingTargets]) if(q.error) fail(q.error.message);
+    const contentRows=[...(communityTargets.data||[]),...(groupTargets.data||[])];
+    const listingRows=listingTargets.data||[];
+    const targetProfileIds=[...new Set([...contentRows.map((x:any)=>x.author_id),...listingRows.map((x:any)=>x.vendor?.owner_id)].filter(Boolean))];
+    const {data:targetProfiles,error:targetProfileError}=targetProfileIds.length?await supabase.from('profiles').select('id,username,display_name,avatar_url').in('id',targetProfileIds):{data:[],error:null};
+    if(targetProfileError)fail(targetProfileError.message);
+    const pm=new Map((reporters.data||[]).map((p:any)=>[p.id,p]));
+    const tpm=new Map([...(profileTargets.data||[]),...(targetProfiles||[])].map((p:any)=>[p.id,p]));
+    const cm=new Map((communityTargets.data||[]).map((p:any)=>[p.id,p]));
+    const gm=new Map((groupTargets.data||[]).map((p:any)=>[p.id,p]));
+    const lm=new Map(listingRows.map((p:any)=>[p.id,p]));
+    return {data:{items:rows.map((x:any)=>{
+      let target:any=null, reportedUserId:string|null=null, targetTitle='';
+      if(x.target_type==='profile'){reportedUserId=x.target_id;target=tpm.get(x.target_id)||null;targetTitle='Member profile';}
+      else if(x.target_type==='community_post'){target=cm.get(x.target_id)||null;reportedUserId=target?.author_id||null;targetTitle='Community post';}
+      else if(x.target_type==='group_post'){target=gm.get(x.target_id)||null;reportedUserId=target?.author_id||null;targetTitle='Group post'+(target?.group?.name?' · '+target.group.name:'');}
+      else if(x.target_type==='marketplace_listing'){target=lm.get(x.target_id)||null;reportedUserId=target?.vendor?.owner_id||null;targetTitle=target?.title||'Marketplace listing';}
+      const reportedUser=reportedUserId?tpm.get(reportedUserId)||null:null;
+      return {...x,reporter:pm.get(x.reporter_id)||null,reporter_name:(pm.get(x.reporter_id) as any)?.display_name||(pm.get(x.reporter_id) as any)?.username||'Unknown member',reported_user_id:reportedUserId,reported_user:reportedUser,reported_user_name:reportedUser?.display_name||reportedUser?.username||target?.vendor?.business_name||'Unknown member',target_title:targetTitle,target_content:target?.text||target?.description||''};
+    })}};
   }
   const reportMessages=path.match(/^\/api\/reports\/([^/]+)\/messages$/);
   if(reportMessages){const rid=reportMessages[1];const {data:rep,error:re}=await supabase.from('moderation_reports').select('id,reporter_id').eq('id',rid).single();if(re)fail(re.message);if(rep.reporter_id!==user.id&&(user.email||'').toLowerCase()!=='princewillobongha@gmail.com')fail('You cannot access this report conversation.');const {data,error}=await supabase.from('report_messages').select('*').eq('report_id',rid).order('created_at',{ascending:true});return {data:{items:ensure(data,error)}};}
@@ -241,9 +284,48 @@ async function get(path: string) {
 }
 async function post(path: string, body: any) {
   const user=await currentUser();
+  const adminEmail=(user.email||'').toLowerCase()==='princewillobongha@gmail.com';
+  const activeRestriction=async (restrictionType:string) => {
+    if(adminEmail) return null;
+    const {data,error}=await supabase.from('member_restrictions').select('restriction_type,reason,expires_at').eq('user_id',user.id).is('deleted_at',null);
+    if(error) fail(error.message);
+    const match=(data||[]).find((r:any)=>(!r.expires_at||new Date(r.expires_at).getTime()>Date.now())&&(r.restriction_type==='all'||r.restriction_type===restrictionType));
+    if(!match)return null;
+    const expiry=match.expires_at?' Access returns on '+new Date(match.expires_at).toLocaleString()+'.':' This restriction has no expiry date.';
+    fail('Posting restricted: '+match.reason+'.'+expiry+' If you think this is a mistake, contact the Calabar Connect City admin.');
+  };
+  if(path.startsWith('/api/admin/restrictions/')&&path.endsWith('/remove')){
+    if(!adminEmail)fail('Admin access required.');
+    const id=path.split('/')[4];
+    const {error}=await supabase.from('member_restrictions').update({deleted_at:new Date().toISOString(),deleted_by:user.id}).eq('id',id).is('deleted_at',null);
+    if(error)fail(error.message);
+    return {data:{ok:true}};
+  }
+  if(path==='/api/admin/restrictions'){
+    if(!adminEmail)fail('Admin access required.');
+    const restrictionType=String(body.restriction_type||'');
+    const targetUser=String(body.user_id||'');
+    const reason=String(body.reason||'').trim().slice(0,1000);
+    if(!targetUser||!['community','groups','marketplace','all'].includes(restrictionType))fail('Choose a member and a valid restriction.');
+    if(!reason)fail('Add a reason so the member understands the restriction.');
+    const {data:existing,error:existingError}=await supabase.from('member_restrictions').select('id,expires_at').eq('user_id',targetUser).eq('restriction_type',restrictionType).is('deleted_at',null);
+    if(existingError)fail(existingError.message);
+    if((existing||[]).some((r:any)=>!r.expires_at||new Date(r.expires_at).getTime()>Date.now()))fail('This restriction is already active for this member.');
+    const rawDays=body.days===null||body.permanent===true?null:Number(body.days);
+    if(rawDays!==null&&(!Number.isInteger(rawDays)||rawDays<1||rawDays>3650))fail('Choose a duration between 1 and 3650 days, or permanent.');
+    const expiresAt=rawDays===null?null:new Date(Date.now()+rawDays*86400000).toISOString();
+    const {data,error}=await supabase.from('member_restrictions').insert({user_id:targetUser,restriction_type:restrictionType,reason,expires_at:expiresAt,created_by:user.id}).select('*').single();
+    const restriction=ensure(data,error);
+    const expiryText=expiresAt?' until '+new Date(expiresAt).toLocaleString():' permanently';
+    const kindLabel=({community:'community posting',groups:'group posting',marketplace:'marketplace listings',all:'all posting'} as Record<string,string>)[restrictionType];
+    const {error:noticeError}=await supabase.from('notifications').insert({user_id:targetUser,actor_id:user.id,kind:'account_restriction',title:'Posting restriction applied',body:'Your '+kindLabel+' has been restricted'+expiryText+'. Reason: '+reason,target_url:'profile://'+targetUser});
+    if(noticeError) fail('Restriction was saved, but the member notification could not be sent: '+noticeError.message);
+    return {data:{item:restriction}};
+  }
   if(path.startsWith('/api/comments/')) fail('Comments are disabled on Calabar Connect City.');
   if(/^\/api\/posts\/[^/]+\/share$/.test(path)) fail('Resharing is disabled on Calabar Connect City.');
   if(path==='/api/listings'){
+    await activeRestriction('marketplace');
     let {data:vendor,error:ve}=await supabase.from('vendors').select('*').eq('owner_id',user.id).maybeSingle();
     if(ve) fail(ve.message);
     if(!vendor){
@@ -285,6 +367,14 @@ async function post(path: string, body: any) {
     const {error:statusError}=await supabase.from('moderation_reports').update({status:'resolved',reviewed_at:new Date().toISOString()}).eq('id',report.id);
     if(statusError)fail(statusError.message);
     return {data:{ok:true}};
+  }
+  const reportDeleteMatch=path.match(/^\/api\/admin\/reports\/([^/]+)\/(delete|restore)$/);
+  if(reportDeleteMatch){
+    if((user.email||'').toLowerCase()!=='princewillobongha@gmail.com')fail('Admin access required.');
+    const isRestore=reportDeleteMatch[2]==='restore';
+    const patch=isRestore?{deleted_at:null,deleted_by:null}:{deleted_at:new Date().toISOString(),deleted_by:user.id};
+    const {data,error}=await supabase.from('moderation_reports').update(patch).eq('id',reportDeleteMatch[1]).select('id,deleted_at').single();
+    return {data:{item:ensure(data,error)}};
   }
   const reportResolveMatch=path.match(/^\/api\/admin\/reports\/([^/]+)\/resolve$/);
   if(reportResolveMatch){
@@ -337,6 +427,7 @@ async function post(path: string, body: any) {
   }
   const groupPostMatch=path.match(/^\/api\/groups\/([^/]+)\/posts$/);
   if(groupPostMatch){
+    await activeRestriction('groups');
     const text=String(body.text||'').trim();if(!text)fail('Write something before posting in the group.');
     const names=[...String(text).matchAll(/@([a-zA-Z0-9_.-]+)/g)].map((m:any)=>m[1].toLowerCase());let mentioned_user_ids:string[]=[];if(names.length){const {data:tagged,error:te}=await supabase.from('profiles').select('id,username').in('username',names);if(te)fail(te.message);mentioned_user_ids=(tagged||[]).filter((p:any)=>p.id!==user.id).map((p:any)=>p.id);}
     const {data,error}=await supabase.from('community_group_posts').insert({group_id:groupPostMatch[1],author_id:user.id,text,image_url:body.image_url||null,mentioned_user_ids}).select('*').single();
@@ -394,6 +485,7 @@ async function post(path: string, body: any) {
     return {data:{ok:true,item:{id:repost.id,original_post_id:postId}}};
   }
   if(path==='/api/posts'){
+    await activeRestriction('community');
     const textValue=String(body.text||''),names=[...textValue.matchAll(/@([a-zA-Z0-9_.-]+)/g)].map((m:any)=>m[1].toLowerCase());let mentioned_user_ids:string[]=[];if(names.length){const {data:tagged,error:te}=await supabase.from('profiles').select('id,username').in('username',names);if(te)fail(te.message);mentioned_user_ids=(tagged||[]).filter((p:any)=>p.id!==user.id).map((p:any)=>p.id);}
     const {data,error}=await supabase.from('community_posts').insert({author_id:user.id,text:textValue,image_url:body.image_url||null,category:body.category||'Community',mentioned_user_ids}).select('*, author_profile:profiles!community_posts_author_id_fkey(display_name,username,avatar_url,is_verified)').single();
     const p=ensure(data,error);return {data:{item:{id:p.id,text:p.text,image_url:p.image_url||null,author:p.author_profile?.display_name||profileName(user),author_id:p.author_id,avatar_url:p.author_profile?.avatar_url||null,is_verified:!!p.author_profile?.is_verified,category:p.category,created_at:p.created_at}}};

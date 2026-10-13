@@ -2310,3 +2310,9 @@ html.dark-mode .admin-capacity-panel{background:#1b2a20;border-color:#304136}htm
 /* Keep the enlarged profile-photo button aligned with the profile cover overlap */
 .public-profile-avatar-button{position:relative;width:92px;height:50px;margin:-48px 0 6px 12px;flex:0 0 92px;overflow:visible}
 .public-profile-avatar-button .public-profile-avatar{position:absolute;top:-44px;left:0;width:92px;height:92px;margin:0}
+
+
+/* Calabar Connect City admin moderation controls */
+.member-restriction-panel{margin-top:18px}.profile-restriction-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:12px}.profile-restriction-actions button{white-space:normal;text-align:center;line-height:1.4}.report-content-preview{margin:8px 0;padding:10px 12px;border-left:3px solid #6e946f;background:#f1f6ef;border-radius:0 8px 8px 0;white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;color:#405344}.active-restrictions-list{display:grid;gap:8px}.active-restrictions-list .member-item{margin:0}.mobile-panel .sign-out-link{margin-top:5px;padding-top:15px;border-top:1px solid #e6e9e2;color:#315f3b;font-weight:800}
+html.dark-mode .report-content-preview{background:#202e24;color:#d6e5d7;border-color:#719b74}
+@media(max-width:560px){.profile-restriction-actions{grid-template-columns:1fr}.member-restriction-panel{padding:12px}}
