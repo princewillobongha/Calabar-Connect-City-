@@ -409,7 +409,7 @@ export default function App() {
   };
   const openGroup = async (group:any) => { setActive('Groups');setSelectedGroup({...group,loading:true,load_error:''});try{const r=await api.get('/api/groups/'+group.id);setSelectedGroup({...group,...(r.data?.item||{}),loading:false,load_error:''});}catch(e:any){const message=e?.message||'Could not load this group. Tap Retry to try again.';setSelectedGroup({...group,loading:false,load_error:message});setNotice(message);} };
   const joinGroup = async (group:any) => {if(!requireMember('Sign in to join a group.'))return;try{await api.post('/api/groups/'+group.id+'/join',{});await openGroup(group);setNotice('You joined '+group.name+'.');}catch(e:any){setNotice(e?.message||'Could not join this group.');}};
-  const createGroupPost = async () => {if(!selectedGroup||!requireMember('Sign in to post in this group.'))return;if(!groupPostText.trim()){setNotice('Write something before posting.');return;}setBusy(true);try{const image_url=groupPostImage?await uploadImage(groupPostImage):null;await api.post('/api/groups/'+selectedGroup.id+'/posts',{text:groupPostText.trim(),image_url});setGroupPostText('');setGroupPostImage(null);await openGroup(selectedGroup);setNotice('Your group post is published.');}catch(e:any){setNotice(e?.message||'Could not publish in this group.');}finally{setBusy(false);}};
+  const createGroupPost = async () => {if(!selectedGroup||!requireMember('Sign in to post in this group.'))return;if(!await canCreateContent('groups'))return;if(!groupPostText.trim()){setNotice('Write something before posting.');return;}setBusy(true);try{const image_url=groupPostImage?await uploadImage(groupPostImage):null;await api.post('/api/groups/'+selectedGroup.id+'/posts',{text:groupPostText.trim(),image_url});setGroupPostText('');setGroupPostImage(null);await openGroup(selectedGroup);setNotice('Your group post is published.');}catch(e:any){setNotice(e?.message||'Could not publish in this group.');}finally{setBusy(false);}};
   const deleteGroupPost = async (post:any) => {if(!selectedGroup||!window.confirm('Delete this post from the group?'))return;try{await api.delete('/api/groups/'+selectedGroup.id+'/posts/'+post.id);await openGroup(selectedGroup);setNotice('Group post deleted.');}catch(e:any){setNotice(e?.message||'Could not delete this group post.');}};
   const removeGroupMember = async (member:any) => {if(!selectedGroup||!window.confirm('Remove this member from the group?'))return;try{await api.delete('/api/groups/'+selectedGroup.id+'/members/'+member.user_id);await openGroup(selectedGroup);setNotice('Member removed from the group.');}catch(e:any){setNotice(e?.message||'Could not remove this member.');}};
   const openPost = async (post:any) => {setSelectedPost(post);};
@@ -423,8 +423,24 @@ export default function App() {
   const toggleFollow = async (id:string) => { if(!requireMember('follow members'))return; try { const r=await api.post('/api/follows/toggle',{followed_id:id}); const following=!!r.data?.following; setIsFollowingProfile(following); setPublicProfile((p:any)=>p&&p.id===id?({...p,followers_count:Math.max(0,(p.followers_count||0)+(following?1:-1))}):p); setNotice(following?'You are now following this member.':'You unfollowed this member.'); } catch(e:any) { setNotice(e?.message||'Could not update follow status.'); } };
   const contactSeller = async (listing:Listing) => { if(listing.sale_status==='sold'){setNotice('This item has been marked SOLD by the seller.');return;} if(!requireMember('contact a seller'))return; const popup=window.open('about:blank','_blank'); try { const r=await api.get('/api/listings/'+listing.id+'/contact'); const url=String(r.data?.url||''); if(!url) { popup?.close(); setNotice('This seller has not added a WhatsApp contact yet.'); return; } if(popup) popup.location.href=url; else window.location.href=url; } catch(e:any) { popup?.close(); const message=e?.message||'Could not open seller contact.'; if(message.toLowerCase().includes('not verified')) { window.alert(message); setSelectedListing(null); } else setNotice(message); } };
   const createGroup = async () => { if(!requireMember('Sign in to create a group.'))return; if(groupName.trim().length<3){setNotice('Group name must be at least 3 characters.');return;} setBusy(true); try { const avatar_url=groupImage?await uploadImage(groupImage):null; const r=await api.post('/api/groups',{name:groupName,description:groupDescription,avatar_url}); setGroups(p=>[r.data.item,...p]); setShowGroupForm(false); setGroupName(''); setGroupDescription(''); setGroupImage(null); setNotice('Group created successfully.'); await openGroup(r.data.item); } catch(e:any) { setNotice(e?.message||'Could not create group.'); } finally {setBusy(false);} };
+  const canCreateContent = async (restrictionType:'community'|'groups'|'marketplace') => {
+    if(isAdmin)return true;
+    try{
+      const r=await api.get('/api/restrictions/mine');
+      const match=(r.data?.items||[]).find((item:any)=>(item.restriction_type==='all'||item.restriction_type===restrictionType)&&(!item.expires_at||new Date(item.expires_at).getTime()>Date.now()));
+      if(!match)return true;
+      const area=restrictionType==='community'?'community posting':restrictionType==='groups'?'group posting':'marketplace listings';
+      const expiry=match.expires_at?' Access returns on '+new Date(match.expires_at).toLocaleString()+'.':' This restriction has no expiry date.';
+      setNotice('Your '+area+' is restricted. Reason: '+match.reason+'.'+expiry);
+      return false;
+    }catch{
+      setNotice('We could not verify your posting permissions. Please try again before uploading or publishing.');
+      return false;
+    }
+  };
   const saveListing = async () => {
     if (!requireMember('Sign in to publish a listing.')) return;
+    if (!await canCreateContent('marketplace')) return;
     if (!form.title.trim() || !form.description.trim()) {
       setNotice('Add a title and description first.');
       return;
@@ -474,6 +490,7 @@ export default function App() {
   };
   const publishPost = async () => {
     if (!requireMember('Sign in to join the conversation.')) return;
+    if (!await canCreateContent('community')) return;
     if (!postText.trim()) {
       setNotice('Write something before posting.');
       return;
