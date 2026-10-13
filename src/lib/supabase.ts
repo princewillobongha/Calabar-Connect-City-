@@ -219,6 +219,11 @@ async function get(path: string) {
     const {data,error}=await supabase.from('profiles').select('id,username,display_name,avatar_url,is_verified,verified_until,verified_days').order('created_at',{ascending:false}).limit(500);
     return {data:{items:ensure(data,error).map((p:any)=>({...p,is_verified:!!p.is_verified&&(!p.verified_until||new Date(p.verified_until).getTime()>Date.now())}))}};
   }
+  if (path === '/api/restrictions/mine') {
+    const {data,error}=await supabase.from('member_restrictions').select('id,restriction_type,reason,expires_at,created_at').eq('user_id',user.id).is('deleted_at',null);
+    const rows=ensure(data,error);
+    return {data:{items:rows.filter((r:any)=>!r.expires_at||new Date(r.expires_at).getTime()>Date.now())}};
+  }
   if (path.startsWith('/api/admin/restrictions')) {
     if ((user.email||'').toLowerCase() !== 'princewillobongha@gmail.com') fail('Admin access required.');
     const userId = new URLSearchParams(path.split('?')[1] || '').get('user_id');
@@ -303,6 +308,9 @@ async function post(path: string, body: any) {
     const reason=String(body.reason||'').trim().slice(0,1000);
     if(!targetUser||!['community','groups','marketplace','all'].includes(restrictionType))fail('Choose a member and a valid restriction.');
     if(!reason)fail('Add a reason so the member understands the restriction.');
+    const {data:existing,error:existingError}=await supabase.from('member_restrictions').select('id,expires_at').eq('user_id',targetUser).eq('restriction_type',restrictionType).is('deleted_at',null);
+    if(existingError)fail(existingError.message);
+    if((existing||[]).some((r:any)=>!r.expires_at||new Date(r.expires_at).getTime()>Date.now()))fail('This restriction is already active for this member.');
     const rawDays=body.days===null||body.permanent===true?null:Number(body.days);
     if(rawDays!==null&&(!Number.isInteger(rawDays)||rawDays<1||rawDays>3650))fail('Choose a duration between 1 and 3650 days, or permanent.');
     const expiresAt=rawDays===null?null:new Date(Date.now()+rawDays*86400000).toISOString();
