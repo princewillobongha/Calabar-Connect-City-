@@ -258,7 +258,7 @@ async function get(path: string) {
   }
   if (path === '/api/admin/reports') {
     if ((user.email||'').toLowerCase() !== 'princewillobongha@gmail.com') fail('Admin access required.');
-    const {data,error}=await supabase.from('moderation_reports').select('*').order('created_at',{ascending:false}).limit(300);
+    const {data,error}=await supabase.from('moderation_reports').select('*').is('deleted_at',null).order('created_at',{ascending:false}).limit(300);
     const rows=ensure(data,error);
     const reporterIds=[...new Set(rows.map((x:any)=>x.reporter_id).filter(Boolean))];
     const profileTargetIds=rows.filter((x:any)=>x.target_type==='profile').map((x:any)=>x.target_id).filter(Boolean);
