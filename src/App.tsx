@@ -837,8 +837,13 @@ export default function App() {
         await openGroup(group);
         window.setTimeout(()=>document.getElementById('group-post-'+postId)?.scrollIntoView({behavior:'smooth',block:'center'}),180);
       } catch { setNotice('Could not open this group post. Please try again.'); }
+      return;
     }
-    if(!target){setNotice('This notification is an informational alert and does not have a linked page.');}
+    if (!target) {
+      setNotice('This is an informational notification without a linked page.');
+    } else {
+      setNotice('This notification has an unrecognized link, so it could not be opened. Your notification is still saved; please open the related section from the menu or contact support.');
+    }
   };
   const openMemberPanel = async (kind: 'friends' | 'notifications') => {
     setMenuOpen(false);
