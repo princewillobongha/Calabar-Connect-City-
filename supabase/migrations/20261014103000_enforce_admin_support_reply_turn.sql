@@ -1,5 +1,8 @@
-create index if not exists admin_support_messages_user_created_idx
-  on public.admin_support_messages (user_id, created_at desc, id desc);
+alter table public.admin_support_messages
+  add column if not exists message_seq bigint generated always as identity;
+
+create index if not exists admin_support_messages_user_seq_idx
+  on public.admin_support_messages (user_id, message_seq desc);
 
 create or replace function public.enforce_admin_support_reply_turn()
 returns trigger
@@ -32,7 +35,7 @@ begin
     select m.sender_role into latest_role
     from public.admin_support_messages as m
     where m.user_id = new.user_id
-    order by m.created_at desc, m.id desc
+    order by m.message_seq desc
     limit 1;
 
     if latest_role is distinct from 'admin' then
