@@ -1301,7 +1301,7 @@ export default function App() {
             <section className="business-directory-page">
               <div className="page-title">
                 <div><div className="eyebrow muted">DISCOVER CALABAR</div><h1>Local businesses & services</h1><p>Explore real businesses and vendors on Calabar Connect City.</p></div>
-                <button className="primary-btn" onClick={()=>{if(requireMember('list a business or item'))setShowListingForm(true);}}><Plus size={16}/> List your business</button>
+                <button className="primary-btn" onClick={()=>{if(requireMember('list a business or item')){if(kycApproved)setShowListingForm(true);else{setActive('KYC');setNotice('You haven’t passed KYC yet. Complete KYC before listing.');}}}}><Plus size={16}/> List your business</button>
               </div>
               {businesses.length>0?<div className="business-directory-grid">{businesses.map((business:any)=><article className="business-directory-card" key={business.id}>
                 <div className="business-directory-image">{business.cover_image_url||business.latest_listing_image?<img src={business.cover_image_url||business.latest_listing_image} alt={business.business_name}/>:<span><Store size={28}/></span>}<small>{business.category||'Local business'}</small></div>
@@ -1309,7 +1309,7 @@ export default function App() {
                   <p>{business.description||'A local business on Calabar Connect City.'}</p><div className="business-directory-meta"><MapPin size={14}/>{business.area||business.address||'Calabar, Cross River'}</div><div className="business-directory-meta"><ShoppingBag size={14}/>{business.listing_count||0} active listings</div>
                   <div className="business-directory-actions"><button className="ghost-btn" onClick={()=>void openPublicProfile(business.owner_id)}>View profile</button><button className="primary-btn" onClick={()=>{setQuery(business.business_name||'');setCategory('All');setActive('Marketplace');}}>View listings</button></div>
                 </div>
-              </article>)}</div>:<div className="empty-state"><Store size={30}/><h3>Local businesses are joining</h3><p>As members create seller profiles, their real businesses will appear here. No demo businesses are shown.</p><button className="primary-btn" onClick={()=>{if(requireMember('list a business or item'))setShowListingForm(true);}}>List the first business</button></div>}
+              </article>)}</div>:<div className="empty-state"><Store size={30}/><h3>Local businesses are joining</h3><p>As members create seller profiles, their real businesses will appear here. No demo businesses are shown.</p><button className="primary-btn" onClick={()=>{if(requireMember('list a business or item')){if(kycApproved)setShowListingForm(true);else{setActive('KYC');setNotice('You haven’t passed KYC yet. Complete KYC before listing.');}}}}>List the first business</button></div>}
             </section>
           )}
           {!memberPanel && active === 'Marketplace' && (
