@@ -204,7 +204,7 @@ async function get(path: string) {
   const user=await currentUser();
   if (path === '/api/admin/support-threads') {
     if ((user.email||'').toLowerCase() !== 'princewillobongha@gmail.com') fail('Admin access required.');
-    const {data,error}=await supabase.from('admin_support_messages').select('id,user_id,sender_id,sender_role,message,created_at').order('created_at',{ascending:false}).limit(1000);
+    const {data,error}=await supabase.from('admin_support_messages').select('id,user_id,sender_id,sender_role,message,created_at,message_seq').order('message_seq',{ascending:false}).limit(1000);
     const rows=ensure(data,error);
     const latestByUser=new Map<string,any>();
     for(const row of rows){if(!latestByUser.has(row.user_id))latestByUser.set(row.user_id,row);}
@@ -218,11 +218,11 @@ async function get(path: string) {
     if ((user.email||'').toLowerCase() !== 'princewillobongha@gmail.com') fail('Admin access required.');
     const targetId=path.slice('/api/admin/support-messages/'.length).split('?')[0];
     if(!targetId)fail('Choose a member conversation.');
-    const {data,error}=await supabase.from('admin_support_messages').select('*').eq('user_id',targetId).order('created_at',{ascending:true}).limit(300);
+    const {data,error}=await supabase.from('admin_support_messages').select('*').eq('user_id',targetId).order('message_seq',{ascending:true}).limit(300);
     return {data:{items:ensure(data,error)}};
   }
   if (path === '/api/support/messages') {
-    const {data,error}=await supabase.from('admin_support_messages').select('*').eq('user_id',user.id).order('created_at',{ascending:true}).limit(300);
+    const {data,error}=await supabase.from('admin_support_messages').select('*').eq('user_id',user.id).order('message_seq',{ascending:true}).limit(300);
     const items=ensure(data,error);
     return {data:{items,can_reply:items.length>0&&items[items.length-1].sender_role==='admin'}};
   }
