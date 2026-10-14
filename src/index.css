@@ -2327,3 +2327,35 @@ html.dark-mode .password-visibility-toggle{color:#d4e2d2}html.dark-mode .admin-s
 .confirmation-feedback{padding:10px 12px;border-radius:10px;background:#edf6eb;color:#285631;font-size:13px;font-weight:600;overflow-wrap:anywhere}html.dark-mode .confirmation-feedback{background:#233b27;color:#d5efd4}
 
 .auth-feedback{margin:12px 0 16px;padding:12px 14px;border:1px solid #e8c7a3;border-radius:10px;background:#fff7ec;color:#7c4517;text-align:left;font-size:12px;line-height:1.65;overflow-wrap:anywhere}.auth-feedback[role=alert]{display:block}.dark-mode .auth-feedback{background:#332719;border-color:#76512b;color:#f4d2a5}
+
+
+/* Private admin-to-member support conversations */
+.admin-support-layout{display:grid;grid-template-columns:minmax(220px,.8fr) minmax(0,1.4fr);gap:18px;margin-top:18px;align-items:start}
+.admin-support-thread-list,.admin-support-conversation{min-width:0;border:1px solid var(--border,#dfe5e0);border-radius:16px;padding:14px;background:var(--surface,#fff)}
+.admin-support-thread-list h4,.admin-support-conversation h4{margin:0 0 12px;font-size:1rem}
+.admin-support-thread{display:flex;width:100%;flex-direction:column;align-items:flex-start;gap:4px;text-align:left;padding:12px;border:1px solid transparent;border-radius:12px;background:transparent;color:inherit;cursor:pointer;margin-bottom:6px}
+.admin-support-thread:hover,.admin-support-thread.active{background:var(--soft-green,#edf5ef);border-color:var(--border,#dfe5e0)}
+.admin-support-thread small,.support-bubble small{font-size:.75rem;opacity:.72}
+.admin-support-thread span{font-size:.85rem;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.admin-support-thread em{font-size:.75rem;font-style:normal;font-weight:700;color:var(--accent,#286344)}
+.support-empty{font-size:.9rem;line-height:1.5;opacity:.72}
+.support-message-list{display:flex;flex-direction:column;gap:12px;max-height:390px;overflow:auto;padding:8px 2px 14px}
+.support-bubble{max-width:88%;padding:11px 13px;border-radius:14px;overflow-wrap:anywhere}
+.support-bubble p{white-space:pre-wrap;margin:5px 0 7px;line-height:1.45}
+.support-bubble time{display:block;font-size:.68rem;opacity:.65}
+.support-bubble-admin{align-self:flex-end;background:var(--soft-green,#edf5ef);border:1px solid var(--border,#dfe5e0)}
+.support-bubble-member{align-self:flex-start;background:var(--surface-muted,#f4f5f4);border:1px solid var(--border,#e2e6e2)}
+.support-compose{display:flex;flex-direction:column;gap:10px;border-top:1px solid var(--border,#e2e6e2);padding-top:12px}
+.support-compose textarea{width:100%;resize:vertical;min-height:75px;border:1px solid var(--border,#dfe5e0);border-radius:12px;padding:11px;background:var(--surface,#fff);color:inherit;font:inherit}
+.support-member-picker{display:flex;flex-direction:column;gap:8px;margin-top:18px;font-size:.88rem}
+.support-member-picker select{width:100%;padding:11px;border:1px solid var(--border,#dfe5e0);border-radius:10px;background:var(--surface,#fff);color:inherit}
+.user-support-modal{width:min(620px,calc(100vw - 28px));max-height:88vh;overflow:auto}
+.user-support-modal h2{margin:8px 0}
+.support-intro{font-size:.9rem;opacity:.75}
+.user-support-message-list{max-height:44vh;margin:14px 0}
+.support-waiting-note{display:flex;align-items:flex-start;gap:10px;padding:14px;border-radius:12px;background:var(--soft-green,#edf5ef);line-height:1.5;font-size:.9rem}
+.support-waiting-note svg{flex:0 0 auto;margin-top:2px}
+.dark-mode .admin-support-thread-list,.dark-mode .admin-support-conversation{background:var(--surface,#18251e);border-color:var(--border,#34453b)}
+.dark-mode .support-bubble-member{background:var(--surface-muted,#26332b);border-color:var(--border,#34453b)}
+.dark-mode .support-compose textarea,.dark-mode .support-member-picker select{background:var(--surface,#18251e);border-color:var(--border,#34453b);color:inherit}
+@media(max-width:720px){.admin-support-layout{grid-template-columns:1fr}.admin-support-thread-list{max-height:250px;overflow:auto}.support-bubble{max-width:96%}.user-support-modal{padding:20px 16px}}
