@@ -335,8 +335,8 @@ async function post(path: string, body: any) {
     if(message.length>4000)fail('Messages must be 4,000 characters or fewer.');
     const {data,error}=await supabase.from('admin_support_messages').insert({user_id:targetId,sender_id:user.id,sender_role:'admin',message}).select('*').single();
     const item=ensure(data,error);
-    const {error:noticeError}=await supabase.from('notifications').insert({user_id:targetId,actor_id:user.id,kind:'admin_message',title:'A message from Calabar Connect City admin',body:'You have a new private message from the Calabar Connect City admin.',target_url:'admin-message://'+targetId});
-    return {data:{item,notificationSent:!noticeError,notificationError:noticeError?.message||null}};
+    // The database trigger creates the member notification in the same transaction.
+    return {data:{item,notificationSent:true}};
   }
   if(path==='/api/support/messages'){
     if(adminEmail)fail('Use the admin dashboard to reply to members.');
