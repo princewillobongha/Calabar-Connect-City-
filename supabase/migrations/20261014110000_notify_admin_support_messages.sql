@@ -39,6 +39,12 @@ end;
 $$;
 revoke all on function public.enforce_admin_support_reply_turn() from public, anon, authenticated;
 
+drop trigger if exists admin_support_reply_turn on public.admin_support_messages;
+drop trigger if exists enforce_admin_support_reply_turn_before_insert on public.admin_support_messages;
+create trigger enforce_admin_support_reply_turn_before_insert
+before insert on public.admin_support_messages
+for each row execute function public.enforce_admin_support_reply_turn();
+
 create or replace function public.notify_admin_support_message()
 returns trigger
 language plpgsql
