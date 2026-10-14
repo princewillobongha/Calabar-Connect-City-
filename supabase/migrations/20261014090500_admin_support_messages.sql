@@ -1,0 +1,72 @@
+create table if not exists public.admin_support_messages (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  sender_id uuid not null references auth.users(id) on delete cascade,
+  sender_role text not null check (sender_role in ('admin','member')),
+  message text not null check (char_length(trim(message)) between 1 and 4000),
+  created_at timestamptz not null default now()
+);
+create index if not exists admin_support_messages_user_created_idx
+  on public.admin_support_messages (user_id, created_at desc, id desc);
+alter table public.admin_support_messages enable row level security;
+revoke all on public.admin_support_messages from public, anon, authenticated;
+grant select, insert on public.admin_support_messages to authenticated;
+drop policy if exists "Support thread participants can read messages" on public.admin_support_messages;
+create policy "Support thread participants can read messages"
+  on public.admin_support_messages for select to authenticated
+  using ((select auth.jwt() ->> 'email') = 'princewillobongha@gmail.com' or user_id = (select auth.uid()));
+drop policy if exists "Only admin or thread member can send support messages" on public.admin_support_messages;
+create policy "Only admin or thread member can send support messages"
+  on public.admin_support_messages for insert to authenticated
+  with check (
+    sender_id = (select auth.uid())
+    and (
+      (sender_role = 'admin' and (select auth.jwt() ->> 'email') = 'princewillobongha@gmail.com' and user_id <> (select auth.uid()))
+      or
+      (sender_role = 'member' and user_id = (select auth.uid()) and (select auth.jwt() ->> 'email') <> 'princewillobongha@gmail.com')
+    )
+  );
+create or replace function public.enforce_admin_support_reply_turn()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+declare
+  is_admin boolean;
+  latest_role text;
+begin
+  is_admin := lower(coalesce((select auth.jwt() ->> 'email'),'')) = 'princewillobongha@gmail.com';
+  if new.sender_id is distinct from (select auth.uid()) then
+    raise exception 'You can only send messages from your signed-in account.';
+  end if;
+  if is_admin then
+    if new.sender_role <> 'admin' or new.user_id = (select auth.uid()) then
+      raise exception 'Admin messages must be sent as admin to another member.';
+    end if;
+  else
+    if new.sender_role <> 'member' or new.user_id <> (select auth.uid()) then
+      raise exception 'Members can only reply in their own private conversation.';
+    end if;
+  end if;
+  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(new.user_id::text,0));
+  if not is_admin then
+    select m.sender_role into latest_role
+      from public.admin_support_messages as m
+      where m.user_id = new.user_id
+      order by m.created_at desc, m.id desc
+      limit 1;
+    if latest_role is distinct from 'admin' then
+      raise exception 'Please wait for the admin to reply before sending another message.';
+    end if;
+  end if;
+  if pg_catalog.length(pg_catalog.btrim(new.message)) < 1 or pg_catalog.length(new.message) > 4000 then
+    raise exception 'Messages must contain between 1 and 4000 characters.';
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists enforce_admin_support_reply_turn_before_insert on public.admin_support_messages;
+create trigger enforce_admin_support_reply_turn_before_insert
+before insert on public.admin_support_messages
+for each row execute function public.enforce_admin_support_reply_turn();
+revoke all on function public.enforce_admin_support_reply_turn() from public, anon, authenticated;

@@ -69,9 +69,9 @@ async function get(path: string) {
   if (path === '/api/listings') {
     const {data,error}=await supabase.from('listings').select('*, vendor:vendors(id,owner_id,business_name,address,area,cover_image_url)').eq('is_available',true).order('created_at',{ascending:false}).limit(100);
     const rows=ensure(data,error); const ownerIds=[...new Set(rows.map((x:any)=>x.vendor?.owner_id).filter(Boolean))];
-    const {data:owners,error:ownerError}=ownerIds.length?await supabase.from('profiles').select('id,username,display_name,is_verified,verified_until').in('id',ownerIds):{data:[],error:null}; if(ownerError)fail(ownerError.message);
-    const ownerMap=new Map((owners||[]).map((p:any)=>[p.id,p]));
-    const {data:ratings,error:ratingsError}=ownerIds.length?await supabase.from('profile_ratings').select('profile_id,rating').in('profile_id',ownerIds):{data:[],error:null};
+    const ownersResult:any=ownerIds.length?await supabase.from('profiles').select('id,username,display_name,is_verified,verified_until').in('id',ownerIds):{data:[],error:null};const {data:owners,error:ownerError}=ownersResult; if(ownerError)fail(ownerError.message);
+    const ownerMap=new Map<string, any>((owners||[]).map((p:any)=>[String(p.id),p] as [string, any]));
+    const ratingsResult:any=ownerIds.length?await supabase.from('profile_ratings').select('profile_id,rating').in('profile_id',ownerIds):{data:[],error:null};const {data:ratings,error:ratingsError}=ratingsResult;
     if(ratingsError) fail(ratingsError.message);
     const ratingMap=new Map<string,{sum:number,count:number}>();
     for(const rating of (ratings||[]) as any[]){const entry=ratingMap.get(rating.profile_id)||{sum:0,count:0};entry.sum+=Number(rating.rating);entry.count++;ratingMap.set(rating.profile_id,entry);}
@@ -96,13 +96,7 @@ async function get(path: string) {
       const message='Hi '+(profile?.display_name||profile?.username||'seller')+', I found your listing "'+(listing as any).title+'" on Calabar Connect City ('+price+'). I am interested. Is it available? Please share the next steps. Thank you.';
       const {error:orderError}=await supabase.from('vendor_enquiries').insert({vendor_id:(listing as any).vendor_id,customer_id:customer.id,listing_id:(listing as any).id,message,status:'new'});
       if(orderError) fail(orderError.message);
-      // A contact is an enquiry, not a confirmed order. Give the seller a tappable listing notification.
-      try {
-        if(ownerId) {
-          const {data:customerProfile}=await supabase.from('profiles').select('display_name,username').eq('id',customer.id).maybeSingle();
-          await supabase.from('notifications').insert({user_id:ownerId,actor_id:customer.id,kind:'listing_enquiry',title:'New listing enquiry',body:(customerProfile?.display_name||customerProfile?.username||'A member')+' contacted you about "'+(listing as any).title+'". This is an enquiry, not a confirmed order.',target_url:'listing://'+(listing as any).id});
-        }
-      } catch { /* The enquiry remains saved even if a notification cannot be delivered. */ }
+      // The database trigger creates the seller's tappable listing-enquiry notification.
       return {data:{url:url+'?text='+encodeURIComponent(message)}};
     }
     return {data:{url}};
@@ -117,11 +111,11 @@ async function get(path: string) {
     const {data:memberRows,error:membersError}=await supabase.from('group_members').select('user_id,role,status,joined_at').eq('group_id',groupId).eq('status','active');
     if(membersError) fail(membersError.message);
     const ids=[...new Set([...(posts||[]).map((p:any)=>p.author_id),...(memberRows||[]).map((m:any)=>m.user_id)])];
-    const {data:profiles,error:profilesError}=ids.length?await supabase.from('profiles').select('id,username,display_name,avatar_url,is_verified,verified_until').in('id',ids):{data:[],error:null};
+    const profilesResult:any=ids.length?await supabase.from('profiles').select('id,username,display_name,avatar_url,is_verified,verified_until').in('id',ids):{data:[],error:null};const {data:profiles,error:profilesError}=profilesResult;
     if(profilesError) fail(profilesError.message);
     const {data:{user:viewer}}=await supabase.auth.getUser();
     const postIds=(posts||[]).map((p:any)=>p.id);
-    const {data:groupLikes,error:likesError}=postIds.length?await supabase.from('community_group_post_reactions').select('post_id,user_id').in('post_id',postIds):{data:[],error:null};
+    const groupLikesResult:any=postIds.length?await supabase.from('community_group_post_reactions').select('post_id,user_id').in('post_id',postIds):{data:[],error:null};const {data:groupLikes,error:likesError}=groupLikesResult;
     if(likesError) fail(likesError.message);
     const isMember=!!viewer&&(memberRows||[]).some((m:any)=>m.user_id===viewer.id);
     const profileMap=new Map((profiles||[]).map((p:any)=>[p.id,p]));
@@ -191,7 +185,10 @@ async function get(path: string) {
   }
   if (path.startsWith('/api/comments/')) {
     const postId=path.split('/')[3];
-    const {data,error}=await supabase.from('community_comments').select('*, author_profile:profiles!community_comments_author_id_fkey(username,display_name,avatar_url,is_verified)').eq('post_id',postId).order('created_at',{ascending:true});
+    const {data:post,error:postError}=await supabase.from('community_posts').select('id,comments_enabled').eq('id',postId).maybeSingle();
+    if(postError)fail(postError.message);
+    if(!post || !post.comments_enabled)return {data:{items:[]}};
+    const {data,error}=await supabase.from('community_comments').select('*, author_profile:profiles!community_comments_author_id_fkey(username,display_name,avatar_url,is_verified)').eq('post_id',postId).is('parent_id',null).order('created_at',{ascending:true});
     return {data:{items:ensure(data,error)}};
   }
   if (path === '/api/posts') {
@@ -205,9 +202,33 @@ async function get(path: string) {
       supabase.auth.getUser()
     ]);if(pe)fail(pe.message);if(le)fail(le.message);if(se)fail(se.message);if(ce)fail(ce.message);
     const pm=new Map((profiles||[]).map((p:any)=>[p.id,p]));
-    return {data:{items:rows.map((p:any)=>{const a:any=pm.get(p.author_id)||{};return {id:p.id,text:p.text,image_url:p.image_url||null,author:a.display_name||a.username||'Calabar Member',author_id:p.author_id,is_verified:!!a.is_verified&&(!a.verified_until||new Date(a.verified_until).getTime()>Date.now()),avatar_url:a.avatar_url||null,category:p.category,created_at:p.created_at,like_count:(likes||[]).filter((x:any)=>x.post_id===p.id).length,liked_by_me:!!viewer&&(likes||[]).some((x:any)=>x.post_id===p.id&&x.user_id===viewer.id),share_count:(shares||[]).filter((x:any)=>x.post_id===p.id).length,shared_by_me:!!viewer&&(shares||[]).some((x:any)=>x.post_id===p.id&&x.user_id===viewer.id),comment_count:0,view_count:Number(p.view_count||0),pinned_at:p.pinned_at||null}})}};
+    return {data:{items:rows.map((p:any)=>{const a:any=pm.get(p.author_id)||{};return {id:p.id,text:p.text,image_url:p.image_url||null,author:a.display_name||a.username||'Calabar Member',author_id:p.author_id,is_verified:!!a.is_verified&&(!a.verified_until||new Date(a.verified_until).getTime()>Date.now()),avatar_url:a.avatar_url||null,category:p.category,created_at:p.created_at,like_count:(likes||[]).filter((x:any)=>x.post_id===p.id).length,liked_by_me:!!viewer&&(likes||[]).some((x:any)=>x.post_id===p.id&&x.user_id===viewer.id),share_count:(shares||[]).filter((x:any)=>x.post_id===p.id).length,shared_by_me:!!viewer&&(shares||[]).some((x:any)=>x.post_id===p.id&&x.user_id===viewer.id),comment_count:(comments||[]).filter((x:any)=>x.post_id===p.id).length,comments_enabled:!!p.comments_enabled,view_count:Number(p.view_count||0),pinned_at:p.pinned_at||null}})}};
   }
   const user=await currentUser();
+  if (path === '/api/admin/support-threads') {
+    if ((user.email||'').toLowerCase() !== 'princewillobongha@gmail.com') fail('Admin access required.');
+    const {data,error}=await supabase.from('admin_support_messages').select('id,user_id,sender_id,sender_role,message,created_at,message_seq').order('message_seq',{ascending:false}).limit(1000);
+    const rows=ensure(data,error);
+    const latestByUser=new Map<string,any>();
+    for(const row of rows){if(!latestByUser.has(row.user_id))latestByUser.set(row.user_id,row);}
+    const ids=[...latestByUser.keys()];
+    const profilesResult:any=ids.length?await supabase.from('profiles').select('id,username,display_name,avatar_url').in('id',ids):{data:[],error:null};const {data:profiles,error:profileError}=profilesResult;
+    if(profileError)fail(profileError.message);
+    const pm=new Map((profiles||[]).map((p:any)=>[p.id,p]));
+    return {data:{items:[...latestByUser.entries()].map(([userId,last]:any)=>({user_id:userId,last_message:last,profile:pm.get(userId)||{},waiting_for_admin:last.sender_role==='member'})).sort((a:any,b:any)=>Date.parse(b.last_message.created_at)-Date.parse(a.last_message.created_at))}};
+  }
+  if (path === '/api/admin/support-messages/' || path.startsWith('/api/admin/support-messages/')) {
+    if ((user.email||'').toLowerCase() !== 'princewillobongha@gmail.com') fail('Admin access required.');
+    const targetId=path.slice('/api/admin/support-messages/'.length).split('?')[0];
+    if(!targetId)fail('Choose a member conversation.');
+    const {data,error}=await supabase.from('admin_support_messages').select('*').eq('user_id',targetId).order('message_seq',{ascending:true}).limit(300);
+    return {data:{items:ensure(data,error)}};
+  }
+  if (path === '/api/support/messages') {
+    const {data,error}=await supabase.from('admin_support_messages').select('*').eq('user_id',user.id).order('message_seq',{ascending:true}).limit(300);
+    const items=ensure(data,error);
+    return {data:{items,can_reply:items.length>0&&items[items.length-1].sender_role==='admin'}};
+  }
   if (path === '/api/friends') {
     const {data,error}=await supabase.from('friend_requests').select('*, sender:profiles!friend_requests_sender_id_fkey(display_name,username), receiver:profiles!friend_requests_receiver_id_fkey(display_name,username)').or('sender_id.eq.'+user.id+',receiver_id.eq.'+user.id).order('created_at',{ascending:false});
     return {data:{items:ensure(data,error).map((x:any)=>({id:x.id,from_id:x.sender_id,to_id:x.receiver_id,from_name:x.sender?.display_name||x.sender?.username||'Member',to_name:x.receiver?.display_name||x.receiver?.username||'Member',status:x.status,created_at:x.created_at}))}};
@@ -216,7 +237,7 @@ async function get(path: string) {
     const {data,error}=await supabase.from('notifications').select('*').eq('user_id',user.id).order('created_at',{ascending:false}).limit(150);
     const rows=ensure(data,error);
     const actorIds=[...new Set(rows.filter((n:any)=>n.actor_id).map((n:any)=>n.actor_id))];
-    const {data:actors,error:actorError}=actorIds.length?await supabase.from('profiles').select('id,display_name,username').in('id',actorIds):{data:[],error:null};
+    const actorsResult:any=actorIds.length?await supabase.from('profiles').select('id,display_name,username').in('id',actorIds):{data:[],error:null};const {data:actors,error:actorError}=actorsResult;
     if(actorError) fail(actorError.message);
     const actorMap=new Map((actors||[]).map((p:any)=>[p.id,p]));
     const normalized=rows.map((n:any)=>{
@@ -276,7 +297,7 @@ async function get(path: string) {
     const contentRows=[...(communityTargets.data||[]),...(groupTargets.data||[])];
     const listingRows=listingTargets.data||[];
     const targetProfileIds=[...new Set([...contentRows.map((x:any)=>x.author_id),...listingRows.map((x:any)=>x.vendor?.owner_id)].filter(Boolean))];
-    const {data:targetProfiles,error:targetProfileError}=targetProfileIds.length?await supabase.from('profiles').select('id,username,display_name,avatar_url').in('id',targetProfileIds):{data:[],error:null};
+    const targetProfilesResult:any=targetProfileIds.length?await supabase.from('profiles').select('id,username,display_name,avatar_url').in('id',targetProfileIds):{data:[],error:null};const {data:targetProfiles,error:targetProfileError}=targetProfilesResult;
     if(targetProfileError)fail(targetProfileError.message);
     const pm=new Map((reporters.data||[]).map((p:any)=>[p.id,p]));
     const tpm=new Map([...(profileTargets.data||[]),...(targetProfiles||[])].map((p:any)=>[p.id,p]));
@@ -308,7 +329,38 @@ async function get(path: string) {
 async function post(path: string, body: any) {
   const user=await currentUser();
   const adminEmail=(user.email||'').toLowerCase()==='princewillobongha@gmail.com';
-  const activeRestriction=async (restrictionType:string) => {
+  const adminSupportMatch=path.match(/^\/api\/admin\/support-messages\/([^/]+)$/);
+  if(adminSupportMatch){
+    if(!adminEmail)fail('Admin access required.');
+    const targetId=adminSupportMatch[1];
+    const message=String(body.message||'').trim();
+    if(!message)fail('Write a message before sending.');
+    if(message.length>4000)fail('Messages must be 4,000 characters or fewer.');
+    const {data,error}=await supabase.from('admin_support_messages').insert({user_id:targetId,sender_id:user.id,sender_role:'admin',message}).select('*').single();
+    const item=ensure(data,error);
+    // The database trigger creates the member notification in the same transaction.
+    return {data:{item,notificationSent:true}};
+  }
+  if(path==='/api/support/messages'){
+    if(adminEmail)fail('Use the admin dashboard to reply to members.');
+    const message=String(body.message||'').trim();
+    if(!message)fail('Write a message before sending.');
+    if(message.length>4000)fail('Messages must be 4,000 characters or fewer.');
+    const {data,error}=await supabase.from('admin_support_messages').insert({user_id:user.id,sender_id:user.id,sender_role:'member',message}).select('*').single();
+    const item=ensure(data,error);
+    return {data:{item,confirmation:'Your message has been sent. A Calabar Connect City admin will be with you shortly.'}};
+  }
+  // Permanently delete a moderation report. This route is admin-only and
+  // deliberately uses DELETE rather than a soft-delete/restore workflow.
+  const reportDelete=path.match(/^\/api\/admin\/reports\/([^/]+)\/delete$/);
+  if(reportDelete){
+    if(!adminEmail) fail('Admin access required.');
+    const {data,error}=await supabase.from('moderation_reports').delete().eq('id',reportDelete[1]).select('id').maybeSingle();
+    if(error) fail(error.message);
+    if(!data) fail('This report was not found or has already been permanently deleted.');
+    return {data:{ok:true,permanentlyDeleted:true}};
+  }
+  const activeRestriction=async (restrictionType:string): Promise<any> => {
     if(adminEmail) return null;
     const {data,error}=await supabase.from('member_restrictions').select('restriction_type,reason,expires_at').eq('user_id',user.id).is('deleted_at',null);
     if(error) fail(error.message);
@@ -348,6 +400,9 @@ async function post(path: string, body: any) {
   if(path.startsWith('/api/comments/')) fail('Comments are disabled on Calabar Connect City.');
   if(/^\/api\/posts\/[^/]+\/share$/.test(path)) fail('Resharing is disabled on Calabar Connect City.');
   if(path==='/api/listings'){
+    const {data:kyc,error:kycError}=await supabase.from('kyc_submissions').select('status').eq('user_id',user.id).maybeSingle();
+    if(kycError)fail(kycError.message);
+    if(kyc?.status!=='approved')fail('You must complete and pass KYC before you can publish a marketplace listing. Open KYC from the menu to continue.');
     await activeRestriction('marketplace');
     let {data:vendor,error:ve}=await supabase.from('vendors').select('*').eq('owner_id',user.id).maybeSingle();
     if(ve) fail(ve.message);
@@ -441,7 +496,7 @@ async function post(path: string, body: any) {
   }
   const groupPostLikeMatch=path.match(/^\/api\/groups\/([^/]+)\/posts\/([^/]+)\/like$/);
   if(groupPostLikeMatch){
-    const groupId=groupPostLikeMatch[1],postId=groupPostLikeMatch[2];
+    const postId=groupPostLikeMatch[2];
     const {data:existing,error:lookupError}=await supabase.from('community_group_post_reactions').select('post_id').eq('post_id',postId).eq('user_id',user.id).maybeSingle();
     if(lookupError) fail(lookupError.message);
     if(existing){const {error}=await supabase.from('community_group_post_reactions').delete().eq('post_id',postId).eq('user_id',user.id);if(error)fail(error.message);return {data:{liked:false}};}
@@ -451,7 +506,7 @@ async function post(path: string, body: any) {
   const groupPostMatch=path.match(/^\/api\/groups\/([^/]+)\/posts$/);
   if(groupPostMatch){
     await activeRestriction('groups');
-    const text=String(body.text||'').trim();if(!text)fail('Write something before posting in the group.');
+    const text=String(body.text||'').trim();if(!text&&!body.image_url)fail('Write something or add a photo before posting in the group.');
     const names=[...String(text).matchAll(/@([a-zA-Z0-9_.-]+)/g)].map((m:any)=>m[1].toLowerCase());let mentioned_user_ids:string[]=[];if(names.length){const {data:tagged,error:te}=await supabase.from('profiles').select('id,username').in('username',names);if(te)fail(te.message);mentioned_user_ids=(tagged||[]).filter((p:any)=>p.id!==user.id).map((p:any)=>p.id);}
     const {data,error}=await supabase.from('community_group_posts').insert({group_id:groupPostMatch[1],author_id:user.id,text,image_url:body.image_url||null,mentioned_user_ids}).select('*').single();
     const p=ensure(data,error);
@@ -507,11 +562,39 @@ async function post(path: string, body: any) {
     if(error){await supabase.from('community_posts').delete().eq('id',repost.id).eq('author_id',user.id);fail(error.message);}
     return {data:{ok:true,item:{id:repost.id,original_post_id:postId}}};
   }
+  const commentToggleMatch=path.match(/^\/api\/posts\/([^/]+)\/comments-enabled$/);
+  if(commentToggleMatch){
+    if(!adminEmail)fail('Admin access required.');
+    const postId=commentToggleMatch[1];
+    const {data:post,error:postError}=await supabase.from('community_posts').select('id,author_id').eq('id',postId).maybeSingle();
+    if(postError)fail(postError.message);
+    if(!post)fail('This community post was not found.');
+    if(post.author_id!==user.id)fail('You can only control comments on community posts published by your admin account.');
+    const enabled=body.enabled===true;
+    const {data,error}=await supabase.from('community_posts').update({comments_enabled:enabled}).eq('id',postId).select('id,comments_enabled').single();
+    const updated=ensure(data,error);
+    return {data:{item:updated}};
+  }
+  const commentCreateMatch=path.match(/^\/api\/posts\/([^/]+)\/comments$/);
+  if(commentCreateMatch){
+    const postId=commentCreateMatch[1];
+    const textValue=String(body.text||'').trim();
+    if(!textValue)fail('Write a comment first.');
+    if(textValue.length>1000)fail('Comments must be 1,000 characters or fewer.');
+    const {data:post,error:postError}=await supabase.from('community_posts').select('id,comments_enabled').eq('id',postId).maybeSingle();
+    if(postError)fail(postError.message);
+    if(!post)fail('This community post was not found.');
+    if(!post.comments_enabled)fail('Comments are closed on this post.');
+    const {data,error}=await supabase.from('community_comments').insert({post_id:postId,author_id:user.id,parent_id:null,text:textValue}).select('*, author_profile:profiles!community_comments_author_id_fkey(username,display_name,avatar_url,is_verified)').single();
+    if(error&&error.code==='23505')fail('You have already commented on this post. Each member can comment once.');
+    const item=ensure(data,error);
+    return {data:{item}};
+  }
   if(path==='/api/posts'){
     await activeRestriction('community');
     const textValue=String(body.text||''),names=[...textValue.matchAll(/@([a-zA-Z0-9_.-]+)/g)].map((m:any)=>m[1].toLowerCase());let mentioned_user_ids:string[]=[];if(names.length){const {data:tagged,error:te}=await supabase.from('profiles').select('id,username').in('username',names);if(te)fail(te.message);mentioned_user_ids=(tagged||[]).filter((p:any)=>p.id!==user.id).map((p:any)=>p.id);}
     const {data,error}=await supabase.from('community_posts').insert({author_id:user.id,text:textValue,image_url:body.image_url||null,category:body.category||'Community',mentioned_user_ids}).select('*, author_profile:profiles!community_posts_author_id_fkey(display_name,username,avatar_url,is_verified)').single();
-    const p=ensure(data,error);return {data:{item:{id:p.id,text:p.text,image_url:p.image_url||null,author:p.author_profile?.display_name||profileName(user),author_id:p.author_id,avatar_url:p.author_profile?.avatar_url||null,is_verified:!!p.author_profile?.is_verified,category:p.category,created_at:p.created_at}}};
+    const p=ensure(data,error);return {data:{item:{id:p.id,text:p.text,image_url:p.image_url||null,author:p.author_profile?.display_name||profileName(user),author_id:p.author_id,avatar_url:p.author_profile?.avatar_url||null,is_verified:!!p.author_profile?.is_verified,category:p.category,created_at:p.created_at,comments_enabled:!!p.comments_enabled,comment_count:0}}};
   }
   if(path.startsWith('/api/groups/')&&path.endsWith('/join')){
     const id=path.split('/')[3];
@@ -576,10 +659,21 @@ export const auth = {
   async signIn(email?:string,password?:string,mode:'signin'|'signup'='signin'){
     if(!email||!password) throw new Error('Enter your email and password.');
     const normalizedEmail=email.trim().toLowerCase();
-    const result=await withTimeout(mode==='signup'
+    let result=await withTimeout(mode==='signup'
       ? supabase.auth.signUp({email:normalizedEmail,password,options:{data:{display_name:'Calabar Member'},emailRedirectTo:authRedirectUrl}})
       : supabase.auth.signInWithPassword({email:normalizedEmail,password}),25000);
-    if(result.error)throw result.error;
+    if(result.error) {
+      // If signup hit the outbound-email limit, try a password login once. This
+      // never bypasses email verification; it only helps an already-active account.
+      const rateLimited=mode==='signup'&&/rate limit|too many requests|email rate/i.test(result.error.message||'');
+      if(rateLimited) {
+        const fallback=await withTimeout(supabase.auth.signInWithPassword({email:normalizedEmail,password}),25000);
+        if(!fallback.error&&fallback.data.user&&fallback.data.session) {
+          return {user:{userId:fallback.data.user.id,email:fallback.data.user.email,name:profileName(fallback.data.user)},existingAccountSignedIn:true};
+        }
+      }
+      throw result.error;
+    }
     if(!result.data.user)throw new Error('Could not complete authentication.');
     if(mode==='signup'&&!result.data.session) return {user:{userId:result.data.user.id,email:result.data.user.email,name:profileName(result.data.user)},confirmationRequired:true};
     return {user:{userId:result.data.user.id,email:result.data.user.email,name:profileName(result.data.user)}};
@@ -607,10 +701,11 @@ async function del(path:string){
   const groupDelete=path.match(/^\/api\/groups\/([^/]+)$/);
   if(groupDelete){
     const groupId=groupDelete[1];
+    const admin=(user.email||'').toLowerCase()==='princewillobongha@gmail.com';
     const {data:group,error:groupError}=await supabase.from('community_groups').select('id,owner_id').eq('id',groupId).single();
     if(groupError)fail(groupError.message);
-    if(group.owner_id!==user.id)fail('Only the group owner can delete this group.');
-    const {data:groupPosts,error:postsError}=await supabase.from('community_group_posts').select('id').eq('group_id',groupId);
+    if(!admin&&group.owner_id!==user.id)fail('Only the group owner or Calabar Connect City admin can delete this group.');
+    const {error:postsError}=await supabase.from('community_group_posts').select('id').eq('group_id',groupId);
     if(postsError)fail(postsError.message);
     // Group-post reactions are removed by the database's ON DELETE CASCADE
     // when the owner deletes the group's posts; do not bypass each user's own-like RLS.
@@ -618,8 +713,11 @@ async function del(path:string){
     if(deletePostsError)fail(deletePostsError.message);
     const {error:deleteMembersError}=await supabase.from('group_members').delete().eq('group_id',groupId);
     if(deleteMembersError)fail(deleteMembersError.message);
-    const {error:deleteGroupError}=await supabase.from('community_groups').delete().eq('id',groupId).eq('owner_id',user.id);
+    let deleteGroupQuery=supabase.from('community_groups').delete().eq('id',groupId);
+    if(!admin)deleteGroupQuery=deleteGroupQuery.eq('owner_id',user.id);
+    const {data:deletedGroup,error:deleteGroupError}=await deleteGroupQuery.select('id').maybeSingle();
     if(deleteGroupError)fail(deleteGroupError.message);
+    if(!deletedGroup)fail('The group was not deleted. Refresh and try again.');
     return {data:{ok:true}};
   }
   const groupPostDelete=path.match(/^\/api\/groups\/([^/]+)\/posts\/([^/]+)$/);
