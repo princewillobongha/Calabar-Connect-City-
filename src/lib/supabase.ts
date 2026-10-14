@@ -586,7 +586,7 @@ export const auth = {
       if(rateLimited) {
         const fallback=await withTimeout(supabase.auth.signInWithPassword({email:normalizedEmail,password}),25000);
         if(!fallback.error&&fallback.data.user&&fallback.data.session) {
-          return {user:{userId:fallback.data.user.id,email:fallback.data.user.email,name:profileName(fallback.data.user)}};
+          return {user:{userId:fallback.data.user.id,email:fallback.data.user.email,name:profileName(fallback.data.user)},existingAccountSignedIn:true};
         }
       }
       throw result.error;
