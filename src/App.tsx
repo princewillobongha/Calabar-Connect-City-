@@ -377,7 +377,33 @@ export default function App() {
   useEffect(()=>{if(!reportChat?.id)return;let live=true;const channel=supabase.channel('report-chat-'+reportChat.id).on('postgres_changes',{event:'INSERT',schema:'public',table:'report_messages',filter:'report_id=eq.'+reportChat.id},()=>{if(live)void api.get('/api/reports/'+reportChat.id+'/messages').then((res:any)=>{if(live)setReportChatMessages(res.data?.items||[]);}).catch(()=>{});}).subscribe();return()=>{live=false;void supabase.removeChannel(channel);};},[reportChat?.id]);
   const openMyReports = async () => {if(!requireMember('view your reports'))return;try{const res=await api.get('/api/reports/mine');setMyReports(res.data?.items||[]);setShowMyReports(true);}catch(e:any){setNotice(e?.message||'Could not load your reports.');}};
   const signOut = async () => {try{await auth.signOut();setUser(null);setMemberPanel(null);setMemberItems([]);setShowAuth(false);setShowProfile(false);setShowListingForm(false);setShowPostForm(false);setShowGroupForm(false);setShowCart(false);setShowPeople(false);setShowAdmin(false);setShowSubscriptions(false);setPublicProfile(null);setSelectedListing(null);setSelectedPost(null);setMyGroupsOpen(false);setMenuOpen(false);setNotice('You have signed out.');}catch(e:any){setNotice(e?.message||'Could not sign out.');}};
-  const openAdmin = async () => { if((user?.email||'').toLowerCase()!=='princewillobongha@gmail.com'){setNotice('Admin access required.');return;} try {const [profilesResult,reportsResult,announcementsResult]=await Promise.all([api.get('/api/admin/profiles'),api.get('/api/admin/reports'),supabase.from('announcements').select('*').order('created_at',{ascending:false}).limit(20)]);if(announcementsResult.error)throw announcementsResult.error;setAnnouncementHistory(announcementsResult.data||[]);setAdminProfiles(profilesResult.data?.items||[]);setAdminReports(reportsResult.data?.items||[]);try{const counts=await Promise.all([supabase.from('profiles').select('*',{count:'exact',head:true}),supabase.from('community_posts').select('*',{count:'exact',head:true}),supabase.from('community_group_posts').select('*',{count:'exact',head:true}),supabase.from('listings').select('*',{count:'exact',head:true}),supabase.from('moderation_reports').select('*',{count:'exact',head:true})]);setAdminStats({members:counts[0].count||0,communityPosts:counts[1].count||0,groupPosts:counts[2].count||0,listings:counts[3].count||0,reports:counts[4].count||reportsResult.data?.items?.length||0});}catch{setAdminStats({members:profilesResult.data?.items?.length||0,reports:reportsResult.data?.items?.length||0});}setShowAdmin(true);} catch(e:any){setNotice(e?.message||'Could not load admin tools.');} };
+  const openAdmin = async () => {
+    if((user?.email||'').toLowerCase()!=='princewillobongha@gmail.com'){setNotice('Admin access required.');return;}
+    try {
+      const [profilesResult,reportsResult,announcementsResult,restrictionsResult]=await Promise.all([
+        api.get('/api/admin/profiles'),api.get('/api/admin/reports'),
+        supabase.from('announcements').select('*').order('created_at',{ascending:false}).limit(20),
+        api.get('/api/admin/restrictions')
+      ]);
+      if(announcementsResult.error)throw announcementsResult.error;
+      setAnnouncementHistory(announcementsResult.data||[]);
+      setAdminProfiles(profilesResult.data?.items||[]);
+      setAdminReports(reportsResult.data?.items||[]);
+      setAdminRestrictionItems(restrictionsResult.data?.items||[]);
+      setAdminSection('home');
+      try {
+        const counts=await Promise.all([
+          supabase.from('profiles').select('*',{count:'exact',head:true}),
+          supabase.from('community_posts').select('*',{count:'exact',head:true}),
+          supabase.from('community_group_posts').select('*',{count:'exact',head:true}),
+          supabase.from('listings').select('*',{count:'exact',head:true}),
+          supabase.from('moderation_reports').select('*',{count:'exact',head:true})
+        ]);
+        setAdminStats({members:counts[0].count||0,communityPosts:counts[1].count||0,groupPosts:counts[2].count||0,listings:counts[3].count||0,reports:reportsResult.data?.items?.length||0});
+      } catch {setAdminStats({members:profilesResult.data?.items?.length||0,reports:reportsResult.data?.items?.length||0});}
+      setShowAdmin(true);
+    } catch(e:any){setNotice(e?.message||'Could not load admin tools.');}
+  };
   const publishAnnouncement = async () => { if((user?.email||'').toLowerCase()!=='princewillobongha@gmail.com'){setNotice('Admin access required.');return;} const title=announcementTitle.trim(),message=announcementMessage.trim();if(!title||!message){setNotice('Add an announcement title and message first.');return;}if(!window.confirm('Send this announcement to every registered member? Each member will receive one notification.'))return;setAnnouncementBusy(true);try{const {data,error}=await supabase.from('announcements').insert({created_by:user?.userId||user?.id,title,message}).select('*').single();if(error)throw error;setAnnouncementHistory(items=>[data,...items].slice(0,20));setAnnouncementTitle('');setAnnouncementMessage('');setNotice('Announcement sent to all registered members.');}catch(e:any){setNotice(e?.message||'Could not send announcement.');}finally{setAnnouncementBusy(false);}};
   const checkUsernameAvailability = async () => {
     const username=String(profile.username||'').trim().toLowerCase();
