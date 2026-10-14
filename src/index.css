@@ -2447,3 +2447,13 @@ html.dark-mode .password-visibility-toggle{color:#d4e2d2}html.dark-mode .admin-s
 .dark-mode .group-search-field,.dark-mode .group-create-entry,.dark-mode .group-poll-card,.dark-mode .group-poll-option,.dark-mode .group-action-menu,.dark-mode .admin-kyc-item,.dark-mode .admin-kyc-detail,.dark-mode .kyc-form-card,.dark-mode .kyc-status-card{background:var(--surface,#18251f);color:var(--text,#e7eee9);border-color:var(--line,#34463d)}
 .dark-mode .group-action-menu button{color:var(--text,#e7eee9)}
 @media(max-width:680px){.group-create-entry{align-items:flex-start;flex-direction:column}.group-floating-plus{right:16px;bottom:82px;width:54px;height:54px}.group-action-menu{right:16px;bottom:146px}.kyc-form-grid,.admin-kyc-layout,.admin-kyc-detail dl,.admin-kyc-photos{grid-template-columns:1fr}.admin-kyc-list{max-height:260px}.kyc-form-card,.kyc-status-card{margin:12px 0;padding:18px}.group-poll-card{padding:14px}}
+
+
+/* Clear KYC gate and admin review filters */
+.kyc-gate-modal { max-width: 480px; }
+.kyc-gate-modal .confirmation-success-icon { margin-bottom: 14px; }
+.kyc-gate-status { margin: 16px 0; padding: 14px 16px; border: 1px solid var(--line, #d9e1dc); border-radius: 14px; background: var(--surface-soft, #f4f7f4); }
+.kyc-gate-status p { margin: 6px 0 0; }
+.admin-kyc-filters { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0; }
+.admin-kyc-filters button { border: 1px solid var(--line, #d9e1dc); border-radius: 999px; background: transparent; padding: 8px 13px; cursor: pointer; font: inherit; }
+.admin-kyc-filters button.active { background: var(--accent, #246b50); color: white; border-color: var(--accent, #246b50); }
