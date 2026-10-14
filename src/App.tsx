@@ -163,6 +163,14 @@ export default function App() {
   const [peopleQuery, setPeopleQuery] = useState('');
   const [people, setPeople] = useState<any[]>([]);
   const [showAdmin, setShowAdmin] = useState(false);
+  const [adminSection, setAdminSection] = useState<'home'|'members'|'safety'|'marketplace'|'announcements'>('home');
+  const [adminRestrictionTargetId, setAdminRestrictionTargetId] = useState('');
+  const [adminRestrictionItems, setAdminRestrictionItems] = useState<any[]>([]);
+  const [adminCommunityPostText, setAdminCommunityPostText] = useState('');
+  const [adminCommunityPostImage, setAdminCommunityPostImage] = useState<File|null>(null);
+  const [mentionTarget, setMentionTarget] = useState<'community'|'group'|'adminPost'|null>(null);
+  const [mentionSuggestions, setMentionSuggestions] = useState<any[]>([]);
+  const [mentionRange, setMentionRange] = useState<{start:number;end:number;query:string}|null>(null);
   const [showSubscriptions, setShowSubscriptions] = useState(false);
   const [publicProfile, setPublicProfile] = useState<any>(null);
   const [isFollowingProfile, setIsFollowingProfile] = useState(false);
