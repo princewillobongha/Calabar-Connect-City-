@@ -216,6 +216,7 @@ export default function App() {
   const [kycForm, setKycForm] = useState({first_name:'',last_name:'',address:'',phone_number:'',date_of_birth:'',business_name:'',nin:'',location:'Calabar, Cross River State'});
   const [ninCardFile, setNinCardFile] = useState<File|null>(null);
   const [facePhotoFile, setFacePhotoFile] = useState<File|null>(null);
+  const [adminKycFilter, setAdminKycFilter] = useState<'pending'|'approved'|'rejected'|'all'>('pending');
   const [adminKycItems, setAdminKycItems] = useState<any[]>([]);
   const [selectedAdminKyc, setSelectedAdminKyc] = useState<any>(null);
   const [adminKycImageUrls, setAdminKycImageUrls] = useState<{nin:string;face:string}>({nin:'',face:''});
@@ -1686,9 +1687,18 @@ export default function App() {
             <button className="ghost-btn" onClick={() => void loadAdminKyc()}>Refresh</button>
           </div>
           {adminKycItems.length === 0 ? <p>No KYC requests have been submitted yet.</p> : (
+            <>
+              <div className="admin-kyc-filters" role="group" aria-label="Filter KYC submissions">
+                {(['pending','approved','rejected','all'] as const).map(status => (
+                  <button key={status} type="button" className={adminKycFilter===status?'active':''} onClick={() => {setAdminKycFilter(status);setSelectedAdminKyc(null);setAdminKycImageUrls({nin:'',face:''});}}>
+                    {status==='all'?'All requests':status.charAt(0).toUpperCase()+status.slice(1)} ({adminKycItems.filter((item:any)=>status==='all'||item.status===status).length})
+                  </button>
+                ))}
+              </div>
+              {adminKycItems.filter((item:any)=>adminKycFilter==='all'||item.status===adminKycFilter).length===0 ? <p>No KYC requests in this filter.</p> : (
             <div className="admin-kyc-layout">
               <div className="admin-kyc-list">
-                {adminKycItems.map((item: any) => (
+                {adminKycItems.filter((item: any) => adminKycFilter === 'all' || item.status === adminKycFilter).map((item: any) => (
                   <button key={item.id} className={'admin-kyc-item ' + (selectedAdminKyc?.id === item.id ? 'active' : '')} onClick={() => void openAdminKycDetail(item)}>
                     <b>{item.first_name} {item.last_name}</b><small>{item.business_name}</small>
                     <span className={'kyc-status-badge ' + item.status}>{item.status}</span>
@@ -1723,6 +1733,8 @@ export default function App() {
                 </div>
               )}
             </div>
+              )}
+            </>
           )}
         </section>
       )}{adminSection==='safety'&&<section className="admin-management-section"><div className="admin-section-heading"><div><h3>Safety & moderation</h3><p>Review who submitted a report, who or what was reported, and the content concerned.</p></div><span>{adminReports.filter((r:any)=>r.status==='open'||r.status==='pending').length} open</span></div>{adminReports.length===0?<p>No active reports to review.</p>:adminReports.map((report:any)=><article className="member-item" key={report.id}><b>{report.target_type} · {report.status}</b><p>Reported by: <strong>{report.reporter_name||'Unknown member'}</strong> (@{report.reporter?.username||'no username'})</p><p>Reported person: <strong>{report.reported_user_name||'Unknown member'}</strong>{report.reported_user?.username?' (@'+report.reported_user.username+')':''}</p>{report.target_title&&<p>Reported item: <strong>{report.target_title}</strong></p>}{report.target_content&&<blockquote className="report-content-preview">{String(report.target_content).slice(0,500)}</blockquote>}<p>Reason: {report.reason}</p><small>{report.details||'No additional explanation'} · {report.created_at?new Date(report.created_at).toLocaleString():''}</small>{report.reported_user_id&&<button className="ghost-btn" onClick={()=>{setShowAdmin(false);void openPublicProfile(report.reported_user_id,report.reported_user||null);}}>View reported person's profile</button>}<button className="ghost-btn" onClick={()=>void openReportChat(report)}>Open report conversation / Reply</button>{['community_post','group_post','marketplace_listing'].includes(report.target_type)&&<button className="danger-link" onClick={async()=>{if(!window.confirm('Remove the reported content? This cannot be undone.'))return;try{await api.post('/api/admin/reports/'+report.id+'/remove-content',{});setAdminReports(rs=>rs.filter(x=>x.id!==report.id));if(report.target_type==='community_post')setPosts(items=>items.filter((p:any)=>p.id!==report.target_id));if(report.target_type==='marketplace_listing')setListings(items=>items.filter((p:any)=>p.id!==report.target_id));if(report.target_type==='group_post')setSelectedGroup((g:any)=>g?({...g,posts:(g.posts||[]).filter((p:any)=>p.id!==report.target_id)}):g);setNotice('Reported content removed and report deleted.');}catch(e:any){setNotice(e?.message||'Could not remove reported content.');}}}>Remove reported content</button>}{(report.status==='open'||report.status==='pending')&&<button className="primary-btn" onClick={async()=>{try{await api.post('/api/admin/reports/'+report.id+'/resolve',{});setAdminReports(rs=>rs.map(x=>x.id===report.id?{...x,status:'resolved'}:x));setNotice('Report marked as reviewed.');}catch(e:any){setNotice(e?.message||'Could not update report.');}}}>Mark reviewed</button>}<button className="danger-link" onClick={async()=>{if(!window.confirm('Permanently delete this report? It cannot be restored.'))return;try{await api.post('/api/admin/reports/'+report.id+'/delete',{});setAdminReports(rs=>rs.filter(x=>x.id!==report.id));setAdminStats((v:any)=>({...v,reports:Math.max(0,v.reports-1)}));setNotice('Report permanently deleted.');}catch(e:any){setNotice(e?.message||'Could not permanently delete this report.');}}}>Delete report permanently</button></article>)}</section>}</div></div>}
