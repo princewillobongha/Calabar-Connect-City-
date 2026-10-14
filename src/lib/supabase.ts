@@ -576,10 +576,21 @@ export const auth = {
   async signIn(email?:string,password?:string,mode:'signin'|'signup'='signin'){
     if(!email||!password) throw new Error('Enter your email and password.');
     const normalizedEmail=email.trim().toLowerCase();
-    const result=await withTimeout(mode==='signup'
+    let result=await withTimeout(mode==='signup'
       ? supabase.auth.signUp({email:normalizedEmail,password,options:{data:{display_name:'Calabar Member'},emailRedirectTo:authRedirectUrl}})
       : supabase.auth.signInWithPassword({email:normalizedEmail,password}),25000);
-    if(result.error)throw result.error;
+    if(result.error) {
+      // If signup hit the outbound-email limit, try a password login once. This
+      // never bypasses email verification; it only helps an already-active account.
+      const rateLimited=mode==='signup'&&/rate limit|too many requests|email rate/i.test(result.error.message||'');
+      if(rateLimited) {
+        const fallback=await withTimeout(supabase.auth.signInWithPassword({email:normalizedEmail,password}),25000);
+        if(!fallback.error&&fallback.data.user&&fallback.data.session) {
+          return {user:{userId:fallback.data.user.id,email:fallback.data.user.email,name:profileName(fallback.data.user)}};
+        }
+      }
+      throw result.error;
+    }
     if(!result.data.user)throw new Error('Could not complete authentication.');
     if(mode==='signup'&&!result.data.session) return {user:{userId:result.data.user.id,email:result.data.user.email,name:profileName(result.data.user)},confirmationRequired:true};
     return {user:{userId:result.data.user.id,email:result.data.user.email,name:profileName(result.data.user)}};
