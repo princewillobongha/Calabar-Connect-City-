@@ -400,6 +400,9 @@ async function post(path: string, body: any) {
   if(path.startsWith('/api/comments/')) fail('Comments are disabled on Calabar Connect City.');
   if(/^\/api\/posts\/[^/]+\/share$/.test(path)) fail('Resharing is disabled on Calabar Connect City.');
   if(path==='/api/listings'){
+    const {data:kyc,error:kycError}=await supabase.from('kyc_submissions').select('status').eq('user_id',user.id).maybeSingle();
+    if(kycError)fail(kycError.message);
+    if(kyc?.status!=='approved')fail('You must complete and pass KYC before you can publish a marketplace listing. Open KYC from the menu to continue.');
     await activeRestriction('marketplace');
     let {data:vendor,error:ve}=await supabase.from('vendors').select('*').eq('owner_id',user.id).maybeSingle();
     if(ve) fail(ve.message);
@@ -503,7 +506,7 @@ async function post(path: string, body: any) {
   const groupPostMatch=path.match(/^\/api\/groups\/([^/]+)\/posts$/);
   if(groupPostMatch){
     await activeRestriction('groups');
-    const text=String(body.text||'').trim();if(!text)fail('Write something before posting in the group.');
+    const text=String(body.text||'').trim();if(!text&&!body.image_url)fail('Write something or add a photo before posting in the group.');
     const names=[...String(text).matchAll(/@([a-zA-Z0-9_.-]+)/g)].map((m:any)=>m[1].toLowerCase());let mentioned_user_ids:string[]=[];if(names.length){const {data:tagged,error:te}=await supabase.from('profiles').select('id,username').in('username',names);if(te)fail(te.message);mentioned_user_ids=(tagged||[]).filter((p:any)=>p.id!==user.id).map((p:any)=>p.id);}
     const {data,error}=await supabase.from('community_group_posts').insert({group_id:groupPostMatch[1],author_id:user.id,text,image_url:body.image_url||null,mentioned_user_ids}).select('*').single();
     const p=ensure(data,error);
