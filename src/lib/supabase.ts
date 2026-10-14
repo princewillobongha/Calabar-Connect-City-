@@ -70,7 +70,7 @@ async function get(path: string) {
     const {data,error}=await supabase.from('listings').select('*, vendor:vendors(id,owner_id,business_name,address,area,cover_image_url)').eq('is_available',true).order('created_at',{ascending:false}).limit(100);
     const rows=ensure(data,error); const ownerIds=[...new Set(rows.map((x:any)=>x.vendor?.owner_id).filter(Boolean))];
     const ownersResult:any=ownerIds.length?await supabase.from('profiles').select('id,username,display_name,is_verified,verified_until').in('id',ownerIds):{data:[],error:null};const {data:owners,error:ownerError}=ownersResult; if(ownerError)fail(ownerError.message);
-    const ownerMap=new Map((owners||[]).map((p:any)=>[p.id,p]));
+    const ownerMap=new Map<string, any>((owners||[]).map((p:any)=>[String(p.id),p] as [string, any]));
     const ratingsResult:any=ownerIds.length?await supabase.from('profile_ratings').select('profile_id,rating').in('profile_id',ownerIds):{data:[],error:null};const {data:ratings,error:ratingsError}=ratingsResult;
     if(ratingsError) fail(ratingsError.message);
     const ratingMap=new Map<string,{sum:number,count:number}>();
