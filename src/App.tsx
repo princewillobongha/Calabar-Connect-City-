@@ -30,6 +30,8 @@ import {
   Cpu,
   HeartPulse,
   Wrench,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 
 type Listing = {
@@ -144,6 +146,10 @@ export default function App() {
   const [recipientId, setRecipientId] = useState('');
   const [authEmail, setAuthEmail] = useState('');
   const [authPassword, setAuthPassword] = useState('');
+  const [authConfirmPassword, setAuthConfirmPassword] = useState('');
+  const [authPasswordVisible, setAuthPasswordVisible] = useState(false);
+  const [authConfirmVisible, setAuthConfirmVisible] = useState(false);
+  const [confirmationBusy, setConfirmationBusy] = useState(false);
   const [authMode, setAuthMode] = useState<'signin'|'signup'>('signin');
   const [confirmationEmail, setConfirmationEmail] = useState('');
   const [listingImage, setListingImage] = useState<File[]>([]);
@@ -301,26 +307,49 @@ export default function App() {
   };
   const signIn = async () => {
     if (busy) return;
+    if (!authEmail.trim()) { setNotice('Enter your email address first.'); return; }
+    if (authPassword.length < 6) { setNotice('Your password must contain at least 6 characters.'); return; }
+    if (authMode === 'signup' && authPassword !== authConfirmPassword) { setNotice('Your passwords do not match. Please check both password fields.'); return; }
     setBusy(true);
     try {
       const result = await auth.signIn(authEmail.trim(), authPassword, authMode);
       if (!(result as any).confirmationRequired) setUser(result.user);
       setShowAuth(false);
       setAuthPassword('');
-      if((result as any).confirmationRequired)setConfirmationEmail(authEmail.trim());else setConfirmationEmail('');
-      setNotice((result as any).confirmationRequired ? 'Account created. Check your email to confirm, then sign in.' : 'You are signed in. Welcome to the community!');
+      setAuthConfirmPassword('');
+      setAuthPasswordVisible(false);
+      setAuthConfirmVisible(false);
+      if((result as any).confirmationRequired) {
+        setConfirmationEmail(authEmail.trim());
+        setNotice('');
+      } else {
+        setConfirmationEmail('');
+        setNotice('You are signed in. Welcome to the community!');
+      }
     } catch (e: any) {
       const message = typeof e?.message === 'string' ? e.message : '';
       setNotice(
         e?.code === 'invalid_credentials'
           ? 'Email or password is incorrect. If you are new, choose Create an account first.'
           : e?.code === 'email_not_confirmed'
-            ? 'Please confirm your email using the latest confirmation email before signing in.'
-            : message || 'Authentication failed. Please check your connection and try again.'
+            ? 'Your email is not confirmed yet. Open the latest confirmation email and tap its confirmation button.'
+            : /already registered|already been registered|user already exists/i.test(message)
+              ? 'An account already exists with this email. Sign in instead, or request a fresh confirmation email if you have not confirmed it yet.'
+              : message || 'We could not complete authentication. Please check your connection and try again.'
       );
     } finally {
       setBusy(false);
     }
+  };
+  const resendSignupConfirmation = async () => {
+    if (!confirmationEmail || confirmationBusy) return;
+    setConfirmationBusy(true);
+    try {
+      await auth.resendConfirmation(confirmationEmail);
+      setNotice('A fresh confirmation link has been sent to '+confirmationEmail+'. Check your inbox and spam folder.');
+    } catch (e:any) {
+      setNotice(e?.message||'We could not resend the confirmation email. Wait a moment and try again.');
+    } finally { setConfirmationBusy(false); }
   };
   const requireMember = (message: string) => {
     if (!user) {
