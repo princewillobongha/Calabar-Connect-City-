@@ -2325,3 +2325,5 @@ html.dark-mode .password-visibility-toggle{color:#d4e2d2}html.dark-mode .admin-s
 @media(max-width:560px){.admin-section-picker{grid-template-columns:1fr}.admin-section-card{padding:13px}.admin-restriction-actions{grid-template-columns:1fr}.admin-page-title{align-items:flex-start;flex-direction:column}}
 
 .confirmation-feedback{padding:10px 12px;border-radius:10px;background:#edf6eb;color:#285631;font-size:13px;font-weight:600;overflow-wrap:anywhere}html.dark-mode .confirmation-feedback{background:#233b27;color:#d5efd4}
+
+.auth-feedback{margin:12px 0 16px;padding:12px 14px;border:1px solid #e8c7a3;border-radius:10px;background:#fff7ec;color:#7c4517;text-align:left;font-size:12px;line-height:1.65;overflow-wrap:anywhere}.auth-feedback[role=alert]{display:block}.dark-mode .auth-feedback{background:#332719;border-color:#76512b;color:#f4d2a5}
