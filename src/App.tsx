@@ -338,7 +338,16 @@ export default function App() {
       }
     } catch (e: any) {
       const message = typeof e?.message === 'string' ? e.message : '';
-      setNotice(
+      const needsConfirmation = e?.code === 'email_not_confirmed' || (authMode === 'signup' && /already registered|already been registered|user already exists/i.test(message));
+      if (needsConfirmation) {
+        setConfirmationEmail(authEmail.trim());
+        setConfirmationFeedback('Use the newest confirmation email if this account is not confirmed. If you already confirmed it, close this message and sign in instead.');
+        setShowAuth(false);
+        setAuthPassword('');
+        setAuthConfirmPassword('');
+        setNotice('');
+      }
+      if (!needsConfirmation) setNotice(
         e?.code === 'invalid_credentials'
           ? 'Email or password is incorrect. If you are new, choose Create an account first.'
           : e?.code === 'email_not_confirmed'
