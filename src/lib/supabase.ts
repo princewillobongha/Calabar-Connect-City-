@@ -212,7 +212,7 @@ async function get(path: string) {
     const {data:profiles,error:profileError}=ids.length?await supabase.from('profiles').select('id,username,display_name,avatar_url').in('id',ids):{data:[],error:null};
     if(profileError)fail(profileError.message);
     const pm=new Map((profiles||[]).map((p:any)=>[p.id,p]));
-    return {data:{items:[...latestByUser.entries()].map(([userId,last]:any)=>({user_id:userId,last_message:last,profile:pm.get(userId)||{},waiting_for_admin:last.sender_role==='member'}).sort((a:any,b:any)=>Date.parse(b.last_message.created_at)-Date.parse(a.last_message.created_at)))}};
+    return {data:{items:[...latestByUser.entries()].map(([userId,last]:any)=>({user_id:userId,last_message:last,profile:pm.get(userId)||{},waiting_for_admin:last.sender_role==='member'})).sort((a:any,b:any)=>Date.parse(b.last_message.created_at)-Date.parse(a.last_message.created_at))}};
   }
   if (path === '/api/admin/support-messages/' || path.startsWith('/api/admin/support-messages/')) {
     if ((user.email||'').toLowerCase() !== 'princewillobongha@gmail.com') fail('Admin access required.');
