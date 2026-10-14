@@ -215,7 +215,7 @@ export default function App() {
     const channel=supabase.channel('calabar-notifications-'+id).on('postgres_changes',{event:'INSERT',schema:'public',table:'notifications',filter:'user_id=eq.'+id},()=>{void refresh();}).subscribe();
     return ()=>{live=false;void supabase.removeChannel(channel);};
   },[user?.userId,user?.id,memberPanel]);
-  const overlayStates = { showAuth, showProfile, showAbout, showListingForm, showPostForm, showGroupForm, showCart, showPeople, showAdmin, showSubscriptions, publicProfile:!!publicProfile, selectedListing:!!selectedListing, selectedPost:!!selectedPost, myGroupsOpen };
+  const overlayStates = { showAuth, showProfile, showAbout, showListingForm, showPostForm, showGroupForm, showCart, showPeople, showAdmin, showSubscriptions, showUserSupportChat, publicProfile:!!publicProfile, selectedListing:!!selectedListing, selectedPost:!!selectedPost, myGroupsOpen };
   const previousOverlayRef = useRef<Record<string, boolean>>({});
   useEffect(() => {
     const previous = previousOverlayRef.current;
@@ -232,13 +232,14 @@ export default function App() {
     if (newlyOpened !== 'showPeople') setShowPeople(false);
     if (newlyOpened !== 'showAdmin') setShowAdmin(false);
     if (newlyOpened !== 'showSubscriptions') setShowSubscriptions(false);
+    if (newlyOpened !== 'showUserSupportChat') setShowUserSupportChat(false);
     if (newlyOpened !== 'publicProfile') setPublicProfile(null);
     if (newlyOpened !== 'selectedListing') setSelectedListing(null);
     if (newlyOpened !== 'selectedPost') setSelectedPost(null);
     if (newlyOpened !== 'myGroupsOpen') setMyGroupsOpen(false);
     setMemberPanel(null);
-  }, [showAuth, showProfile, showAbout, showListingForm, showPostForm, showGroupForm, showCart, showPeople, showAdmin, showSubscriptions, publicProfile, selectedListing, selectedPost, myGroupsOpen]);
-  useEffect(()=>{const anyModal=showAuth||showProfile||showAbout||showListingForm||showPostForm||showGroupForm||showCart||showPeople||showAdmin||showSubscriptions||!!publicProfile||!!selectedListing||!!selectedPost||myGroupsOpen;document.body.style.overflow=anyModal?'hidden':'';const onKey=(e:KeyboardEvent)=>{if(e.key==='Escape'){setShowAuth(false);setShowProfile(false);setShowAbout(false);setShowListingForm(false);setShowPostForm(false);setShowGroupForm(false);setShowCart(false);setShowPeople(false);setShowAdmin(false);setShowSubscriptions(false);setPublicProfile(null);setSelectedListing(null);setSelectedPost(null);setMyGroupsOpen(false);}};window.addEventListener('keydown',onKey);return()=>{document.body.style.overflow='';window.removeEventListener('keydown',onKey);};},[showAuth,showProfile,showAbout,showListingForm,showPostForm,showGroupForm,showCart,showPeople,showAdmin,showSubscriptions,publicProfile,selectedListing,selectedPost,myGroupsOpen]);
+  }, [showAuth, showProfile, showAbout, showListingForm, showPostForm, showGroupForm, showCart, showPeople, showAdmin, showSubscriptions, showUserSupportChat, publicProfile, selectedListing, selectedPost, myGroupsOpen]);
+  useEffect(()=>{const anyModal=showAuth||showProfile||showAbout||showListingForm||showPostForm||showGroupForm||showCart||showPeople||showAdmin||showSubscriptions||showUserSupportChat||!!publicProfile||!!selectedListing||!!selectedPost||myGroupsOpen;document.body.style.overflow=anyModal?'hidden':'';const onKey=(e:KeyboardEvent)=>{if(e.key==='Escape'){setShowAuth(false);setShowProfile(false);setShowAbout(false);setShowListingForm(false);setShowPostForm(false);setShowGroupForm(false);setShowCart(false);setShowPeople(false);setShowAdmin(false);setShowSubscriptions(false);setShowUserSupportChat(false);setPublicProfile(null);setSelectedListing(null);setSelectedPost(null);setMyGroupsOpen(false);}};window.addEventListener('keydown',onKey);return()=>{document.body.style.overflow='';window.removeEventListener('keydown',onKey);};},[showAuth,showProfile,showAbout,showListingForm,showPostForm,showGroupForm,showCart,showPeople,showAdmin,showSubscriptions,publicProfile,selectedListing,selectedPost,myGroupsOpen]);
   useEffect(()=>{setSelectedListing(null);setSelectedPost(null);setPublicProfile(null);setShowAuth(false);setShowProfile(false);setShowAbout(false);setShowListingForm(false);setShowPostForm(false);setShowGroupForm(false);setShowCart(false);setShowPeople(false);setShowAdmin(false);setShowSubscriptions(false);setMyGroupsOpen(false);setMemberPanel(null);setMenuOpen(false);},[active]);
   useEffect(()=>{if(active!=='Businesses')return;let live=true;api.get('/api/discover/businesses').then(r=>{if(live)setBusinesses(r.data?.items||[]);}).catch((e:any)=>{if(live)setNotice(e?.message||'Could not load local businesses.');});return()=>{live=false;};},[active]);
   useEffect(() => {
@@ -800,7 +801,7 @@ export default function App() {
     if (!requireMember('Sign in to use member tools.')) return;
     setShowAuth(false); setShowProfile(false); setShowListingForm(false); setShowPostForm(false);
     setShowGroupForm(false); setShowCart(false); setShowPeople(false); setShowAdmin(false);
-    setShowSubscriptions(false); setPublicProfile(null); setSelectedListing(null); setSelectedPost(null); setMyGroupsOpen(false);
+    setShowSubscriptions(false); setShowUserSupportChat(false); setPublicProfile(null); setSelectedListing(null); setSelectedPost(null); setMyGroupsOpen(false);
     setMemberPanel(kind);
     setMemberItems([]);
     try {
