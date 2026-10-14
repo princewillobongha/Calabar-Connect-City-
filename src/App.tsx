@@ -405,6 +405,44 @@ export default function App() {
     } catch(e:any){setNotice(e?.message||'Could not load admin tools.');}
   };
   const publishAnnouncement = async () => { if((user?.email||'').toLowerCase()!=='princewillobongha@gmail.com'){setNotice('Admin access required.');return;} const title=announcementTitle.trim(),message=announcementMessage.trim();if(!title||!message){setNotice('Add an announcement title and message first.');return;}if(!window.confirm('Send this announcement to every registered member? Each member will receive one notification.'))return;setAnnouncementBusy(true);try{const {data,error}=await supabase.from('announcements').insert({created_by:user?.userId||user?.id,title,message}).select('*').single();if(error)throw error;setAnnouncementHistory(items=>[data,...items].slice(0,20));setAnnouncementTitle('');setAnnouncementMessage('');setNotice('Announcement sent to all registered members.');}catch(e:any){setNotice(e?.message||'Could not send announcement.');}finally{setAnnouncementBusy(false);}};
+  const publishAdminCommunityPost = async () => {
+    if(!isAdmin){setNotice('Admin access required.');return;}
+    const textValue=adminCommunityPostText.trim();
+    if(!textValue){setNotice('Write a community post first.');return;}
+    setAnnouncementBusy(true);
+    try{
+      const image_url=adminCommunityPostImage?await uploadImage(adminCommunityPostImage):null;
+      const r=await api.post('/api/posts',{text:textValue,image_url,category:'Community'});
+      setPosts(items=>[r.data.item,...items]);
+      setAdminCommunityPostText('');setAdminCommunityPostImage(null);
+      setNotice('Your community post has been published.');
+    }catch(e:any){setNotice(e?.message||'Could not publish the community post.');}
+    finally{setAnnouncementBusy(false);}
+  };
+  const updateMentionSuggestions = async (value:string, caret:number, target:'community'|'group'|'adminPost') => {
+    const before=value.slice(0,caret);
+    const match=before.match(/(^|\\s)@([a-zA-Z0-9_]{0,20})$/);
+    if(!match){if(mentionTarget===target){setMentionTarget(null);setMentionSuggestions([]);setMentionRange(null);}return;}
+    const start=caret-match[0].length+match[1].length;
+    const query=match[2]||'';
+    setMentionTarget(target);setMentionRange({start,end:caret,query});
+    try{
+      const r=await api.get('/api/people?q='+encodeURIComponent(query));
+      const selfId=user?.userId||user?.id;
+      setMentionSuggestions((r.data?.items||[]).filter((p:any)=>p.id!==selfId).slice(0,7));
+    }catch{setMentionSuggestions([]);}
+  };
+  const chooseMention = (person:any) => {
+    if(!mentionTarget||!mentionRange)return;
+    const value=mentionTarget==='community'?postText:mentionTarget==='group'?groupPostText:adminCommunityPostText;
+    const next=value.slice(0,mentionRange.start)+'@'+(person.username||'member')+' '+value.slice(mentionRange.end);
+    if(mentionTarget==='community')setPostText(next);
+    else if(mentionTarget==='group')setGroupPostText(next);
+    else setAdminCommunityPostText(next);
+    const target=mentionTarget;
+    setMentionTarget(null);setMentionSuggestions([]);setMentionRange(null);
+    window.setTimeout(()=>{const el=document.querySelector('textarea[data-mention-target="'+target+'"]') as HTMLTextAreaElement|null;if(el){el.focus();const pos=mentionRange.start+String('@'+(person.username||'member')+' ').length;el.setSelectionRange(pos,pos);}},0);
+  };
   const checkUsernameAvailability = async () => {
     const username=String(profile.username||'').trim().toLowerCase();
     const valid=/^[a-z0-9][a-z0-9_]{1,18}[a-z0-9]$/.test(username);
@@ -436,6 +474,7 @@ export default function App() {
       await api.post('/api/admin/restrictions',{user_id:targetId,restriction_type:restrictionType,reason:reason.trim(),days,permanent});
       const restrictions=await refreshMemberRestrictions(targetId);
       setPublicProfile((p:any)=>p?.id===targetId?({...p,restrictions}):p);
+      if(adminRestrictionTargetId===targetId)setAdminRestrictionItems(restrictions);
       setNotice('Restriction applied. The member has been notified.');
     }catch(e:any){setNotice(e?.message||'Could not apply this restriction.');}
   };
@@ -446,6 +485,7 @@ export default function App() {
       await api.post('/api/admin/restrictions/'+restriction.id+'/remove',{});
       const restrictions=await refreshMemberRestrictions(targetId);
       setPublicProfile((p:any)=>p?.id===targetId?({...p,restrictions}):p);
+      if(adminRestrictionTargetId===targetId)setAdminRestrictionItems(restrictions);
       setNotice('Restriction removed.');
     }catch(e:any){setNotice(e?.message||'Could not remove this restriction.');}
   };
