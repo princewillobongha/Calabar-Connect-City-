@@ -1,0 +1,25 @@
+name: Verify Calabar Connect City build
+
+on:
+  push:
+    branches:
+      - auth-admin-seo-mentions-20261014
+  pull_request:
+    branches:
+      - main
+      - auth-admin-seo-mentions-20261014
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install dependencies
+        run: npm install
+      - name: Build application
+        run: npm run build

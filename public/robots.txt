@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://calabar-connect-city-omega.vercel.app/sitemap.xml
