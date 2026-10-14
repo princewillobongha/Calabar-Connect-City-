@@ -431,7 +431,7 @@ export default function App() {
     try{
       const r=await api.get('/api/people?q='+encodeURIComponent(query));
       const selfId=user?.userId||user?.id;
-      setMentionSuggestions((r.data?.items||[]).filter((p:any)=>p.id!==selfId).slice(0,7));
+      setMentionSuggestions((r.data?.items||[]).filter((p:any)=>p.id!==selfId&&(!query||[p.username,p.display_name,p.full_name].some((value:any)=>String(value||'').toLowerCase().startsWith(query.toLowerCase())))).slice(0,7));
     }catch{setMentionSuggestions([]);}
   };
   const chooseMention = (person:any) => {
