@@ -310,7 +310,7 @@ async function post(path: string, body: any) {
   const adminEmail=(user.email||'').toLowerCase()==='princewillobongha@gmail.com';
   // Permanently delete a moderation report. This route is admin-only and
   // deliberately uses DELETE rather than a soft-delete/restore workflow.
-  const reportDelete=path.match(/^\\/api\\/admin\\/reports\\/([^/]+)\\/delete$/);
+  const reportDelete=path.match(/^\/api\/admin\/reports\/([^/]+)\/delete$/);
   if(reportDelete){
     if(!adminEmail) fail('Admin access required.');
     const {data,error}=await supabase.from('moderation_reports').delete().eq('id',reportDelete[1]).select('id').maybeSingle();
