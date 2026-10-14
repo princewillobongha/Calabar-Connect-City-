@@ -861,11 +861,11 @@ export default function App() {
   const loadKycStatus = async () => {if(!user){setKycSubmission(null);return;}setKycLoading(true);try{const {data,error}=await supabase.from('kyc_submissions').select('*').eq('user_id',user.userId||user.id).maybeSingle();if(error)throw error;setKycSubmission(data||null);if(data?.status==='rejected')setKycForm((v:any)=>({...v,first_name:data.first_name||v.first_name,last_name:data.last_name||v.last_name,address:data.address||v.address,phone_number:data.phone_number||v.phone_number,date_of_birth:data.date_of_birth||v.date_of_birth,business_name:data.business_name||v.business_name,nin:data.nin||v.nin,location:data.location||v.location}));}catch(e:any){setNotice(e?.message||'Could not load your KYC status.');}finally{setKycLoading(false);}};
   const requireKycForPublishing = (action: string) => {
     if (kycSubmission?.status === 'approved') return true;
-    setNotice('KYC verification is required before you can publish ' + action + '. Complete KYC and wait for admin approval, then try again.');
+    setNotice('');
     setShowPostForm(false);
     setShowGroupComposer(false);
     setShowPollForm(false);
-    setActive('KYC');
+    setShowKycGate(true);
     return false;
   };
   const submitKyc = async () => {if(!requireMember('Sign in to submit KYC.'))return;if(kycBusy)return;const v=kycForm;if(!v.first_name.trim()||!v.last_name.trim()||!v.address.trim()||!v.phone_number.trim()||!v.date_of_birth||!v.business_name.trim()||!/^\d{11}$/.test(v.nin.trim())||!v.location.toLowerCase().includes('calabar')){setNotice('Complete every field, enter an 11-digit NIN, and confirm your location is in Calabar.');return;}if(!ninCardFile||!facePhotoFile){setNotice('Upload a clear NIN card photo and a clear face photo.');return;}for(const f of [ninCardFile,facePhotoFile])if(!['image/jpeg','image/png','image/webp'].includes(f.type)||f.size>5*1024*1024){setNotice('Use JPG, PNG or WEBP images no larger than 5 MB each.');return;}setKycBusy(true);try{const uid=user.userId||user.id;const uploadPrivate=async(file:File,prefix:string)=>{const ext=(file.name.split('.').pop()||'jpg').replace(/[^a-z0-9]/gi,'').toLowerCase();const path=uid+'/'+prefix+'-'+crypto.randomUUID()+'.'+ext;const {error}=await supabase.storage.from('kyc-documents').upload(path,file,{upsert:false,contentType:file.type});if(error)throw error;return path;};const ninPath=await uploadPrivate(ninCardFile,'nin-card');let facePath='';try{facePath=await uploadPrivate(facePhotoFile,'face-photo');}catch(e){await supabase.storage.from('kyc-documents').remove([ninPath]);throw e;}const payload:any={user_id:uid,first_name:v.first_name.trim(),last_name:v.last_name.trim(),address:v.address.trim(),phone_number:v.phone_number.trim(),date_of_birth:v.date_of_birth,business_name:v.business_name.trim(),nin:v.nin.trim(),location:v.location.trim(),nin_card_path:ninPath,face_photo_path:facePath,status:'pending',admin_note:null,reviewed_by:null,reviewed_at:null,updated_at:new Date().toISOString()};const result=kycSubmission?.status==='rejected'?await supabase.from('kyc_submissions').update(payload).eq('user_id',uid).eq('status','rejected').select('*').single():await supabase.from('kyc_submissions').insert(payload).select('*').single();if(result.error)throw result.error;setKycSubmission(result.data);setNinCardFile(null);setFacePhotoFile(null);setNotice('Your KYC has been submitted for admin review.');}catch(e:any){setNotice(e?.message||'Could not submit KYC. Please check your connection and try again.');}finally{setKycBusy(false);}};
@@ -1632,6 +1632,26 @@ export default function App() {
         ))}
       </nav>
       {showAbout && <div className="modal-backdrop" onClick={() => setShowAbout(false)}><div className="modal form-modal about-modal" onClick={e => e.stopPropagation()}><button className="modal-close" onClick={() => setShowAbout(false)}><X size={18}/></button><div className="eyebrow muted">ABOUT US</div><h2>Calabar Connect City</h2><p>Calabar Connect City brings people, local businesses, community conversations, groups, jobs and marketplace discoveries together in Calabar, Cross River State.</p><p>Our goal is to make it easier for residents to discover trusted local services, connect with neighbours and share useful community updates.</p><button className="primary-btn full-btn" onClick={() => setShowAbout(false)}>Back to Calabar Connect City</button></div></div>}
+      {showKycGate && (
+        <div className="modal-backdrop kyc-gate-backdrop" role="dialog" aria-modal="true" aria-labelledby="kyc-gate-title" onClick={() => setShowKycGate(false)}>
+          <div className="modal form-modal kyc-gate-modal" onClick={e => e.stopPropagation()}>
+            <button className="modal-close" aria-label="Close KYC notice" onClick={() => setShowKycGate(false)}><X size={18}/></button>
+            <div className="confirmation-success-icon"><ShieldCheck size={24}/></div>
+            <span className="eyebrow muted">TRUST & SAFETY</span>
+            <h2 id="kyc-gate-title">KYC approval is required to publish</h2>
+            <p>To help keep Calabar Connect City safe and trustworthy, members must complete identity verification and receive admin approval before publishing community posts, group posts or polls, or marketplace listings.</p>
+            {kycSubmission?.status === 'pending' ? (
+              <div className="kyc-gate-status"><b>Your KYC is awaiting review.</b><p>You can publish after the admin has reviewed and approved your submission. We’ll notify you when a decision is made.</p></div>
+            ) : kycSubmission?.status === 'rejected' ? (
+              <div className="kyc-gate-status"><b>Your KYC needs an update.</b><p>{kycSubmission.admin_note || 'Open KYC to review your details and submit an update.'}</p></div>
+            ) : (
+              <div className="kyc-gate-status"><b>You haven’t completed KYC yet.</b><p>Open the KYC page, complete the required details, and upload your NIN card photo and face photo for private admin review.</p></div>
+            )}
+            <button className="primary-btn full-btn" onClick={() => { setShowKycGate(false); setActive('KYC'); }}>{kycSubmission?.status === 'pending' ? 'View KYC status' : kycSubmission?.status === 'rejected' ? 'Update KYC details' : 'Start KYC verification'} <ChevronRight size={16}/></button>
+            <button className="text-link full-btn" onClick={() => setShowKycGate(false)}>Not now</button>
+          </div>
+        </div>
+      )}
       {showAuth && (
         <div className="modal-backdrop" onClick={() => setShowAuth(false)}>
           <div className="modal auth-modal" onClick={e => e.stopPropagation()}>
