@@ -1321,8 +1321,9 @@ export default function App() {
                 <button
                   className="primary-btn"
                   onClick={() => {
-                    if (requireMember('publish a listing'))
-                      setShowListingForm(true);
+                    if (!requireMember('publish a listing')) return;
+                    if (kycApproved) setShowListingForm(true);
+                    else { setActive('KYC'); setNotice('You haven’t passed KYC yet. Complete KYC before listing.'); }
                   }}
                 >
                   <Plus size={17} /> Create listing
@@ -1513,7 +1514,8 @@ export default function App() {
                         title: '',
                         description: '',
                       }));
-                      setShowListingForm(true);
+                      if (kycApproved) setShowListingForm(true);
+                      else { setActive('KYC'); setNotice('You haven’t passed KYC yet. Complete KYC before posting an opportunity.'); }
                     }
                   }}
                 >
