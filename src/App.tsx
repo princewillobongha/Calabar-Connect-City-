@@ -460,6 +460,30 @@ export default function App() {
     } catch(e:any) {setNotice(e?.message||'Could not send your reply.');}
     finally {setUserSupportBusy(false);}
   };
+  useEffect(()=>{
+    const id=user?.userId||user?.id;
+    if(!id||!showUserSupportChat||isAdmin)return;
+    let live=true;
+    const refresh=async()=>{try{const result=await api.get('/api/support/messages');if(live)setUserSupportMessages(result.data?.items||[]);}catch{}};
+    const channel=supabase.channel('admin-support-member-'+id)
+      .on('postgres_changes',{event:'INSERT',schema:'public',table:'admin_support_messages',filter:'user_id=eq.'+id},()=>{void refresh();})
+      .subscribe();
+    return()=>{live=false;void supabase.removeChannel(channel);};
+  },[user?.userId,user?.id,showUserSupportChat,isAdmin]);
+  useEffect(()=>{
+    if(!isAdmin||!showAdmin||adminSection!=='messages')return;
+    let live=true;
+    const refresh=async()=>{
+      try{await loadAdminSupportThreads();}catch{}
+      if(selectedSupportUserId){
+        try{const result=await api.get('/api/admin/support-messages/'+selectedSupportUserId);if(live)setAdminSupportMessages(result.data?.items||[]);}catch{}
+      }
+    };
+    const channel=supabase.channel('admin-support-dashboard')
+      .on('postgres_changes',{event:'INSERT',schema:'public',table:'admin_support_messages'},()=>{if(live)void refresh();})
+      .subscribe();
+    return()=>{live=false;void supabase.removeChannel(channel);};
+  },[isAdmin,showAdmin,adminSection,selectedSupportUserId]);
   const openAdmin = async () => {
     if((user?.email||'').toLowerCase()!=='princewillobongha@gmail.com'){setNotice('Admin access required.');return;}
     try {
