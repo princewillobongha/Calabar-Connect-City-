@@ -591,7 +591,7 @@ async function post(path: string, body: any) {
     await activeRestriction('community');
     const textValue=String(body.text||''),names=[...textValue.matchAll(/@([a-zA-Z0-9_.-]+)/g)].map((m:any)=>m[1].toLowerCase());let mentioned_user_ids:string[]=[];if(names.length){const {data:tagged,error:te}=await supabase.from('profiles').select('id,username').in('username',names);if(te)fail(te.message);mentioned_user_ids=(tagged||[]).filter((p:any)=>p.id!==user.id).map((p:any)=>p.id);}
     const {data,error}=await supabase.from('community_posts').insert({author_id:user.id,text:textValue,image_url:body.image_url||null,category:body.category||'Community',mentioned_user_ids}).select('*, author_profile:profiles!community_posts_author_id_fkey(display_name,username,avatar_url,is_verified)').single();
-    const p=ensure(data,error);return {data:{item:{id:p.id,text:p.text,image_url:p.image_url||null,author:p.author_profile?.display_name||profileName(user),author_id:p.author_id,avatar_url:p.author_profile?.avatar_url||null,is_verified:!!p.author_profile?.is_verified,category:p.category,created_at:p.created_at}}};
+    const p=ensure(data,error);return {data:{item:{id:p.id,text:p.text,image_url:p.image_url||null,author:p.author_profile?.display_name||profileName(user),author_id:p.author_id,avatar_url:p.author_profile?.avatar_url||null,is_verified:!!p.author_profile?.is_verified,category:p.category,created_at:p.created_at,comments_enabled:!!p.comments_enabled,comment_count:0}}};
   }
   if(path.startsWith('/api/groups/')&&path.endsWith('/join')){
     const id=path.split('/')[3];
