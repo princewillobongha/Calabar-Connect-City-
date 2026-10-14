@@ -496,7 +496,7 @@ async function post(path: string, body: any) {
   }
   const groupPostLikeMatch=path.match(/^\/api\/groups\/([^/]+)\/posts\/([^/]+)\/like$/);
   if(groupPostLikeMatch){
-    const groupId=groupPostLikeMatch[1],postId=groupPostLikeMatch[2];
+    const postId=groupPostLikeMatch[2];
     const {data:existing,error:lookupError}=await supabase.from('community_group_post_reactions').select('post_id').eq('post_id',postId).eq('user_id',user.id).maybeSingle();
     if(lookupError) fail(lookupError.message);
     if(existing){const {error}=await supabase.from('community_group_post_reactions').delete().eq('post_id',postId).eq('user_id',user.id);if(error)fail(error.message);return {data:{liked:false}};}
@@ -705,7 +705,7 @@ async function del(path:string){
     const {data:group,error:groupError}=await supabase.from('community_groups').select('id,owner_id').eq('id',groupId).single();
     if(groupError)fail(groupError.message);
     if(!admin&&group.owner_id!==user.id)fail('Only the group owner or Calabar Connect City admin can delete this group.');
-    const {data:groupPosts,error:postsError}=await supabase.from('community_group_posts').select('id').eq('group_id',groupId);
+    const {error:postsError}=await supabase.from('community_group_posts').select('id').eq('group_id',groupId);
     if(postsError)fail(postsError.message);
     // Group-post reactions are removed by the database's ON DELETE CASCADE
     // when the owner deletes the group's posts; do not bypass each user's own-like RLS.
