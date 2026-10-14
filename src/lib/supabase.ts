@@ -96,13 +96,7 @@ async function get(path: string) {
       const message='Hi '+(profile?.display_name||profile?.username||'seller')+', I found your listing "'+(listing as any).title+'" on Calabar Connect City ('+price+'). I am interested. Is it available? Please share the next steps. Thank you.';
       const {error:orderError}=await supabase.from('vendor_enquiries').insert({vendor_id:(listing as any).vendor_id,customer_id:customer.id,listing_id:(listing as any).id,message,status:'new'});
       if(orderError) fail(orderError.message);
-      // A contact is an enquiry, not a confirmed order. Give the seller a tappable listing notification.
-      try {
-        if(ownerId) {
-          const {data:customerProfile}=await supabase.from('profiles').select('display_name,username').eq('id',customer.id).maybeSingle();
-          await supabase.from('notifications').insert({user_id:ownerId,actor_id:customer.id,kind:'listing_enquiry',title:'New listing enquiry',body:(customerProfile?.display_name||customerProfile?.username||'A member')+' contacted you about "'+(listing as any).title+'". This is an enquiry, not a confirmed order.',target_url:'listing://'+(listing as any).id});
-        }
-      } catch { /* The enquiry remains saved even if a notification cannot be delivered. */ }
+      // The database trigger creates the seller's tappable listing-enquiry notification.
       return {data:{url:url+'?text='+encodeURIComponent(message)}};
     }
     return {data:{url}};
