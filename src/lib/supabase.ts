@@ -185,7 +185,10 @@ async function get(path: string) {
   }
   if (path.startsWith('/api/comments/')) {
     const postId=path.split('/')[3];
-    const {data,error}=await supabase.from('community_comments').select('*, author_profile:profiles!community_comments_author_id_fkey(username,display_name,avatar_url,is_verified)').eq('post_id',postId).order('created_at',{ascending:true});
+    const {data:post,error:postError}=await supabase.from('community_posts').select('id,comments_enabled').eq('id',postId).maybeSingle();
+    if(postError)fail(postError.message);
+    if(!post || !post.comments_enabled)return {data:{items:[]}};
+    const {data,error}=await supabase.from('community_comments').select('*, author_profile:profiles!community_comments_author_id_fkey(username,display_name,avatar_url,is_verified)').eq('post_id',postId).is('parent_id',null).order('created_at',{ascending:true});
     return {data:{items:ensure(data,error)}};
   }
   if (path === '/api/posts') {
@@ -199,7 +202,7 @@ async function get(path: string) {
       supabase.auth.getUser()
     ]);if(pe)fail(pe.message);if(le)fail(le.message);if(se)fail(se.message);if(ce)fail(ce.message);
     const pm=new Map((profiles||[]).map((p:any)=>[p.id,p]));
-    return {data:{items:rows.map((p:any)=>{const a:any=pm.get(p.author_id)||{};return {id:p.id,text:p.text,image_url:p.image_url||null,author:a.display_name||a.username||'Calabar Member',author_id:p.author_id,is_verified:!!a.is_verified&&(!a.verified_until||new Date(a.verified_until).getTime()>Date.now()),avatar_url:a.avatar_url||null,category:p.category,created_at:p.created_at,like_count:(likes||[]).filter((x:any)=>x.post_id===p.id).length,liked_by_me:!!viewer&&(likes||[]).some((x:any)=>x.post_id===p.id&&x.user_id===viewer.id),share_count:(shares||[]).filter((x:any)=>x.post_id===p.id).length,shared_by_me:!!viewer&&(shares||[]).some((x:any)=>x.post_id===p.id&&x.user_id===viewer.id),comment_count:0,view_count:Number(p.view_count||0),pinned_at:p.pinned_at||null}})}};
+    return {data:{items:rows.map((p:any)=>{const a:any=pm.get(p.author_id)||{};return {id:p.id,text:p.text,image_url:p.image_url||null,author:a.display_name||a.username||'Calabar Member',author_id:p.author_id,is_verified:!!a.is_verified&&(!a.verified_until||new Date(a.verified_until).getTime()>Date.now()),avatar_url:a.avatar_url||null,category:p.category,created_at:p.created_at,like_count:(likes||[]).filter((x:any)=>x.post_id===p.id).length,liked_by_me:!!viewer&&(likes||[]).some((x:any)=>x.post_id===p.id&&x.user_id===viewer.id),share_count:(shares||[]).filter((x:any)=>x.post_id===p.id).length,shared_by_me:!!viewer&&(shares||[]).some((x:any)=>x.post_id===p.id&&x.user_id===viewer.id),comment_count:(comments||[]).filter((x:any)=>x.post_id===p.id).length,comments_enabled:!!p.comments_enabled,view_count:Number(p.view_count||0),pinned_at:p.pinned_at||null}})}};
   }
   const user=await currentUser();
   if (path === '/api/admin/support-threads') {
@@ -556,6 +559,34 @@ async function post(path: string, body: any) {
     if(error){await supabase.from('community_posts').delete().eq('id',repost.id).eq('author_id',user.id);fail(error.message);}
     return {data:{ok:true,item:{id:repost.id,original_post_id:postId}}};
   }
+  const commentToggleMatch=path.match(/^\/api\/posts\/([^/]+)\/comments-enabled$/);
+  if(commentToggleMatch){
+    if(!adminEmail)fail('Admin access required.');
+    const postId=commentToggleMatch[1];
+    const {data:post,error:postError}=await supabase.from('community_posts').select('id,author_id').eq('id',postId).maybeSingle();
+    if(postError)fail(postError.message);
+    if(!post)fail('This community post was not found.');
+    if(post.author_id!==user.id)fail('You can only control comments on community posts published by your admin account.');
+    const enabled=body.enabled===true;
+    const {data,error}=await supabase.from('community_posts').update({comments_enabled:enabled}).eq('id',postId).select('id,comments_enabled').single();
+    const updated=ensure(data,error);
+    return {data:{item:updated}};
+  }
+  const commentCreateMatch=path.match(/^\/api\/posts\/([^/]+)\/comments$/);
+  if(commentCreateMatch){
+    const postId=commentCreateMatch[1];
+    const textValue=String(body.text||'').trim();
+    if(!textValue)fail('Write a comment first.');
+    if(textValue.length>1000)fail('Comments must be 1,000 characters or fewer.');
+    const {data:post,error:postError}=await supabase.from('community_posts').select('id,comments_enabled').eq('id',postId).maybeSingle();
+    if(postError)fail(postError.message);
+    if(!post)fail('This community post was not found.');
+    if(!post.comments_enabled)fail('Comments are closed on this post.');
+    const {data,error}=await supabase.from('community_comments').insert({post_id:postId,author_id:user.id,parent_id:null,text:textValue}).select('*, author_profile:profiles!community_comments_author_id_fkey(username,display_name,avatar_url,is_verified)').single();
+    if(error&&error.code==='23505')fail('You have already commented on this post. Each member can comment once.');
+    const item=ensure(data,error);
+    return {data:{item}};
+  }
   if(path==='/api/posts'){
     await activeRestriction('community');
     const textValue=String(body.text||''),names=[...textValue.matchAll(/@([a-zA-Z0-9_.-]+)/g)].map((m:any)=>m[1].toLowerCase());let mentioned_user_ids:string[]=[];if(names.length){const {data:tagged,error:te}=await supabase.from('profiles').select('id,username').in('username',names);if(te)fail(te.message);mentioned_user_ids=(tagged||[]).filter((p:any)=>p.id!==user.id).map((p:any)=>p.id);}
@@ -667,9 +698,10 @@ async function del(path:string){
   const groupDelete=path.match(/^\/api\/groups\/([^/]+)$/);
   if(groupDelete){
     const groupId=groupDelete[1];
+    const admin=(user.email||'').toLowerCase()==='princewillobongha@gmail.com';
     const {data:group,error:groupError}=await supabase.from('community_groups').select('id,owner_id').eq('id',groupId).single();
     if(groupError)fail(groupError.message);
-    if(group.owner_id!==user.id)fail('Only the group owner can delete this group.');
+    if(!admin&&group.owner_id!==user.id)fail('Only the group owner or Calabar Connect City admin can delete this group.');
     const {data:groupPosts,error:postsError}=await supabase.from('community_group_posts').select('id').eq('group_id',groupId);
     if(postsError)fail(postsError.message);
     // Group-post reactions are removed by the database's ON DELETE CASCADE
@@ -678,8 +710,11 @@ async function del(path:string){
     if(deletePostsError)fail(deletePostsError.message);
     const {error:deleteMembersError}=await supabase.from('group_members').delete().eq('group_id',groupId);
     if(deleteMembersError)fail(deleteMembersError.message);
-    const {error:deleteGroupError}=await supabase.from('community_groups').delete().eq('id',groupId).eq('owner_id',user.id);
+    let deleteGroupQuery=supabase.from('community_groups').delete().eq('id',groupId);
+    if(!admin)deleteGroupQuery=deleteGroupQuery.eq('owner_id',user.id);
+    const {data:deletedGroup,error:deleteGroupError}=await deleteGroupQuery.select('id').maybeSingle();
     if(deleteGroupError)fail(deleteGroupError.message);
+    if(!deletedGroup)fail('The group was not deleted. Refresh and try again.');
     return {data:{ok:true}};
   }
   const groupPostDelete=path.match(/^\/api\/groups\/([^/]+)\/posts\/([^/]+)$/);
