@@ -225,7 +225,6 @@ export default function App() {
   const [selectedPostComments, setSelectedPostComments] = useState<any[]>([]);
   const [commentDraft, setCommentDraft] = useState('');
   const [commentBusy, setCommentBusy] = useState(false);
-  const [postSearchResults, setPostSearchResults] = useState<any[]>([]);
   const [myGroupsOpen, setMyGroupsOpen] = useState(false);
   const [cart, setCart] = useState<Listing[]>(() => { try { return JSON.parse(localStorage.getItem('ccc-cart') || '[]'); } catch { return []; } });
   useEffect(() => { localStorage.setItem('ccc-cart', JSON.stringify(cart)); }, [cart]);
@@ -303,36 +302,6 @@ export default function App() {
       authListener.subscription.unsubscribe();
     };
   }, []);
-  const filtered = useMemo(
-    () =>
-      listings.filter(item => {
-        const categoryNeedle = ({
-          'Food & Restaurants': 'food',
-          'Fashion & Clothing': 'fashion',
-          'Electronics & Gadgets': 'gadget',
-          'Beauty & Personal Care': 'beauty',
-          'Repairs & Professional Services': 'service',
-          'Jobs & Opportunities': 'job',
-        } as Record<string, string>)[category] || category.toLowerCase();
-        const itemCategory = (String(item.category || '') + ' ' + String(item.kind || '') + ' ' + String(item.title || '') + ' ' + String(item.description || '')).toLowerCase();
-        const matchesCategory = category === 'All' ||
-          itemCategory.includes(categoryNeedle) ||
-          (category === 'Electronics & Gadgets' && /electronics|electronic|gadget|phone|computer|laptop/.test(itemCategory)) ||
-          (category === 'Beauty & Personal Care' && /beauty|personal care|cosmetic|skincare|hair/.test(itemCategory)) ||
-          (category === 'Repairs & Professional Services' && /repair|service|professional/.test(itemCategory));
-        const text = (
-          item.title +
-          ' ' +
-          item.description +
-          ' ' +
-          item.location +
-          ' ' +
-          item.vendor
-        ).toLowerCase();
-        return matchesCategory && text.includes(query.toLowerCase());
-      }),
-    [listings, category, query]
-  );
   const filteredMarketplace = useMemo(() => {
     const term = marketplaceQuery.trim().toLowerCase();
     const categoryNeedle = ({'Food & Restaurants':'food','Fashion & Clothing':'fashion','Electronics & Gadgets':'gadget','Beauty & Personal Care':'beauty','Repairs & Professional Services':'service','Jobs & Opportunities':'job'} as Record<string,string>)[category] || category.toLowerCase();
@@ -434,7 +403,7 @@ export default function App() {
   useEffect(() => { localStorage.setItem('ccc-cart', JSON.stringify(cart)); }, [cart]);
   const searchPeople = async () => { try { const r=await api.get('/api/people?q='+encodeURIComponent(peopleQuery)); setPeople(shuffleList(r.data?.items||[])); } catch { setNotice('Could not search members.'); } };
   const togglePersonFollow = async (person:any) => { if(!requireMember('follow members'))return; try { const r=await api.post('/api/follows/toggle',{followed_id:person.id}); const following=!!r.data?.following; setPeople(prev=>prev.map(p=>p.id===person.id?({...p,is_following:following}):p)); setNotice(following?'You are now following '+(person.display_name||person.username||'this member')+'.':'You unfollowed this member.'); } catch(e:any) { setNotice(e?.message||'Could not update follow status.'); } };
-  const sendFriendRequest = async (person:any) => { if(!requireMember('send a friend request'))return; try { if(person.friend_request_direction==='received'&&person.friend_request_id){await api.post('/api/friends/'+person.friend_request_id+'/respond',{accept:true});setPeople(prev=>prev.map(p=>p.id===person.id?({...p,friend_status:'accepted'}):p));setNotice('You are now connected with '+(person.display_name||person.username||'this member')+'.');return;} await api.post('/api/friends/request',{to_id:person.id});setPeople(prev=>prev.map(p=>p.id===person.id?({...p,friend_status:'pending',friend_request_direction:'sent'}):p));setNotice('Friend request sent.'); } catch(e:any) { setNotice(e?.message||'Could not send the friend request.'); } };
+
   const sendReport = async () => {if(!reportTarget||!requireMember('send a report'))return;const reason=reportText.trim();if(!reason){setNotice('Write your report message first.');return;}setReportBusy(true);try{await api.post('/api/reports',{target_type:reportTarget.type,target_id:reportTarget.id,reason});setReportTarget(null);setReportText('');setNotice('Your report has been successfully sent to the admin. It will be reviewed.');}catch(e:any){setNotice(e?.message||'Could not send your report.');}finally{setReportBusy(false);}};
   const openReportChat = async (report:any) => {setReportChat(report);setReportChatMessages([]);setReportChatText('');try{const res=await api.get('/api/reports/'+report.id+'/messages');setReportChatMessages(res.data?.items||[]);}catch(e:any){setNotice(e?.message||'Could not load report conversation.');}};
   const sendReportReply = async () => {if(!reportChat||!reportChatText.trim())return;try{const res=await api.post('/api/reports/'+reportChat.id+'/messages',{message:reportChatText.trim()});setReportChatMessages(v=>[...v,res.data.item]);setReportChatText('');}catch(e:any){setNotice(e?.message||'Could not send reply.');}};
@@ -885,20 +854,6 @@ export default function App() {
     } catch {
       setNotice('Could not load this area. Please try again.');
     }
-  };
-  const interact = (label: string) => {
-    if (!requireMember('Sign in to ' + label + '.')) return;
-    if (label.includes('notification')) { void openMemberPanel('notifications'); return; }
-    if (label.startsWith('join ')) {
-      const name = label.slice(5);
-      const group = groups.find(g => g.name === name);
-      if (!group) { setNotice('This group is not available right now.'); return; }
-      void api.post('/api/groups/' + group.id + '/join', {})
-        .then(() => setNotice('You joined ' + name + '.'))
-        .catch(() => setNotice('Could not join this group. Please try again.'));
-      return;
-    }
-    setNotice('You are signed in. Use the People directory and Connections tools to connect with members.');
   };
   const nav = ['Discover', 'Marketplace', 'Community', 'Groups', 'Businesses', 'Jobs'];
   const kycApproved = kycSubmission?.status === 'approved';
@@ -1926,7 +1881,7 @@ function ListingGrid({
 }) {
   return (
     <div className="listing-grid">
-      {items.map((item, i) => (
+      {items.map((item, _i) => (
         <article className="listing-card" key={item.id}>
           <button
             className="listing-image"
