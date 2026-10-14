@@ -689,7 +689,7 @@ export default function App() {
   const saveListing = async () => {
     if (busy) return;
     if (!requireMember('Sign in to publish a listing.')) return;
-    if (!isAdmin && kycSubmission?.status !== 'approved') { setKycGateAction('a marketplace listing'); setShowListingForm(false); setShowKycGate(true); return; }
+    if (!isAdmin && !kycApproved) { setShowListingForm(false); openKycGate('a marketplace listing'); return; }
     if (!await canCreateContent('marketplace')) return;
     if (!form.title.trim() || !form.description.trim()) {
       setNotice('Add a title and description first.');
@@ -869,14 +869,18 @@ export default function App() {
   const nav = ['Discover', 'Marketplace', 'Community', 'Groups', 'Businesses', 'Jobs'];
   const kycApproved = kycSubmission?.status === 'approved';
   const loadKycStatus = async () => {if(!user){setKycSubmission(null);return;}setKycLoading(true);try{const {data,error}=await supabase.from('kyc_submissions').select('*').eq('user_id',user.userId||user.id).maybeSingle();if(error)throw error;setKycSubmission(data||null);if(data?.status==='rejected')setKycForm((v:any)=>({...v,first_name:data.first_name||v.first_name,last_name:data.last_name||v.last_name,address:data.address||v.address,phone_number:data.phone_number||v.phone_number,date_of_birth:data.date_of_birth||v.date_of_birth,business_name:data.business_name||v.business_name,nin:data.nin||v.nin,location:data.location||v.location}));}catch(e:any){setNotice(e?.message||'Could not load your KYC status.');}finally{setKycLoading(false);}};
-  const requireKycForPublishing = (action: string) => {
-    if (isAdmin || kycSubmission?.status === 'approved') return true;
+  const openKycGate = (action: string) => {
     setKycGateAction(action);
+    setShowKycGate(true);
+  };
+  const requireKycForPublishing = (action: string) => {
+    if (isAdmin || kycApproved) return true;
     setNotice('');
+    setShowListingForm(false);
     setShowPostForm(false);
     setShowGroupComposer(false);
     setShowPollForm(false);
-    setShowKycGate(true);
+    openKycGate(action);
     return false;
   };
   const submitKyc = async () => {if(!requireMember('Sign in to submit KYC.'))return;if(kycBusy)return;const v=kycForm;if(!v.first_name.trim()||!v.last_name.trim()||!v.address.trim()||!v.phone_number.trim()||!v.date_of_birth||!v.business_name.trim()||!/^\d{11}$/.test(v.nin.trim())||!v.location.toLowerCase().includes('calabar')){setNotice('Complete every field, enter an 11-digit NIN, and confirm your location is in Calabar.');return;}if(!ninCardFile||!facePhotoFile){setNotice('Upload a clear NIN card photo and a clear face photo.');return;}for(const f of [ninCardFile,facePhotoFile])if(!['image/jpeg','image/png','image/webp'].includes(f.type)||f.size>5*1024*1024){setNotice('Use JPG, PNG or WEBP images no larger than 5 MB each.');return;}setKycBusy(true);try{const uid=user.userId||user.id;const uploadPrivate=async(file:File,prefix:string)=>{const ext=(file.name.split('.').pop()||'jpg').replace(/[^a-z0-9]/gi,'').toLowerCase();const path=uid+'/'+prefix+'-'+crypto.randomUUID()+'.'+ext;const {error}=await supabase.storage.from('kyc-documents').upload(path,file,{upsert:false,contentType:file.type});if(error)throw error;return path;};const ninPath=await uploadPrivate(ninCardFile,'nin-card');let facePath='';try{facePath=await uploadPrivate(facePhotoFile,'face-photo');}catch(e){await supabase.storage.from('kyc-documents').remove([ninPath]);throw e;}const payload:any={user_id:uid,first_name:v.first_name.trim(),last_name:v.last_name.trim(),address:v.address.trim(),phone_number:v.phone_number.trim(),date_of_birth:v.date_of_birth,business_name:v.business_name.trim(),nin:v.nin.trim(),location:v.location.trim(),nin_card_path:ninPath,face_photo_path:facePath,status:'pending',admin_note:null,reviewed_by:null,reviewed_at:null,updated_at:new Date().toISOString()};const result=kycSubmission?.status==='rejected'?await supabase.from('kyc_submissions').update(payload).eq('user_id',uid).eq('status','rejected').select('*').single():await supabase.from('kyc_submissions').insert(payload).select('*').single();if(result.error)throw result.error;setKycSubmission(result.data);setNinCardFile(null);setFacePhotoFile(null);setNotice('Your KYC has been submitted for admin review.');}catch(e:any){setNotice(e?.message||'Could not submit KYC. Please check your connection and try again.');}finally{setKycBusy(false);}};
