@@ -308,6 +308,16 @@ async function get(path: string) {
 async function post(path: string, body: any) {
   const user=await currentUser();
   const adminEmail=(user.email||'').toLowerCase()==='princewillobongha@gmail.com';
+  // Permanently delete a moderation report. This route is admin-only and
+  // deliberately uses DELETE rather than a soft-delete/restore workflow.
+  const reportDelete=path.match(/^\\/api\\/admin\\/reports\\/([^/]+)\\/delete$/);
+  if(reportDelete){
+    if(!adminEmail) fail('Admin access required.');
+    const {data,error}=await supabase.from('moderation_reports').delete().eq('id',reportDelete[1]).select('id').maybeSingle();
+    if(error) fail(error.message);
+    if(!data) fail('This report was not found or has already been permanently deleted.');
+    return {data:{ok:true,permanentlyDeleted:true}};
+  }
   const activeRestriction=async (restrictionType:string) => {
     if(adminEmail) return null;
     const {data,error}=await supabase.from('member_restrictions').select('restriction_type,reason,expires_at').eq('user_id',user.id).is('deleted_at',null);
