@@ -273,7 +273,7 @@ export default function App() {
   useEffect(()=>{const anyModal=showAuth||showProfile||showAbout||showListingForm||showPostForm||showGroupForm||showGroupComposer||showPollForm||showCart||showPeople||showAdmin||showSubscriptions||showUserSupportChat||!!publicProfile||!!selectedListing||!!selectedPost||myGroupsOpen;document.body.style.overflow=anyModal?'hidden':'';const onKey=(e:KeyboardEvent)=>{if(e.key==='Escape'){setShowAuth(false);setShowProfile(false);setShowAbout(false);setShowListingForm(false);setShowPostForm(false);setShowGroupForm(false);setShowGroupComposer(false);setShowPollForm(false);setShowCart(false);setShowPeople(false);setShowAdmin(false);setShowSubscriptions(false);setShowUserSupportChat(false);setPublicProfile(null);setSelectedListing(null);setSelectedPost(null);setMyGroupsOpen(false);}};window.addEventListener('keydown',onKey);return()=>{document.body.style.overflow='';window.removeEventListener('keydown',onKey);};},[showAuth,showProfile,showAbout,showListingForm,showPostForm,showGroupForm,showGroupComposer,showPollForm,showCart,showPeople,showAdmin,showSubscriptions,publicProfile,selectedListing,selectedPost,myGroupsOpen]);
   useEffect(()=>{setSelectedListing(null);setSelectedPost(null);setPublicProfile(null);setShowAuth(false);setShowProfile(false);setShowAbout(false);setShowListingForm(false);setShowPostForm(false);setShowGroupForm(false);setShowGroupComposer(false);setShowPollForm(false);setShowGroupActionMenu(false);setShowCart(false);setShowPeople(false);setShowAdmin(false);setShowSubscriptions(false);setMyGroupsOpen(false);setMemberPanel(null);setMenuOpen(false);},[active]);
   useEffect(()=>{if(active==='Marketplace')setListings(items=>shuffleList(items));},[active]);
-  useEffect(()=>{if(active==='KYC'&&user)void loadKycStatus();},[active,user?.userId,user?.id]);
+  useEffect(()=>{if(user)void loadKycStatus();else setKycSubmission(null);},[user?.userId,user?.id]);
   useEffect(()=>{if(active!=='Businesses')return;let live=true;api.get('/api/discover/businesses').then(r=>{if(live)setBusinesses(r.data?.items||[]);}).catch((e:any)=>{if(live)setNotice(e?.message||'Could not load local businesses.');});return()=>{live=false;};},[active]);
   useEffect(() => {
     let live = true;
@@ -810,7 +810,7 @@ export default function App() {
     setMemberPanel(null);
     setMenuOpen(false);
     const target=String(item?.target_url||'');
-    if (target.startsWith('kyc://')) { setActive('KYC'); setNotice('Your KYC status is shown here.'); return; }
+    if (target.startsWith('kyc://')) { await loadKycStatus(); setActive('KYC'); setNotice('Your KYC status is shown here.'); return; }
     if (target.startsWith('admin-message://')) {
       const targetId=target.slice('admin-message://'.length);
       if((user?.email||'').toLowerCase()==='princewillobongha@gmail.com'){
