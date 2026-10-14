@@ -140,6 +140,7 @@ export default function App() {
   });
   const [postText, setPostText] = useState('');
   const [busy, setBusy] = useState(false);
+  const publishPostLock = useRef(false);
   const [memberPanel, setMemberPanel] = useState<'friends' | 'notifications' | null>(null);
   const [memberItems, setMemberItems] = useState<any[]>([]);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
@@ -712,6 +713,7 @@ export default function App() {
     }
   };
   const saveListing = async () => {
+    if (busy) return;
     if (!requireMember('Sign in to publish a listing.')) return;
     if (kycSubmission?.status !== 'approved') { setShowListingForm(false); setActive('KYC'); setNotice('You must pass KYC before you can publish a marketplace listing.'); return; }
     if (!await canCreateContent('marketplace')) return;
@@ -763,13 +765,14 @@ export default function App() {
     }
   };
   const publishPost = async () => {
-    if (busy) return;
+    if (busy || publishPostLock.current) return;
     if (!requireMember('Sign in to join the conversation.')) return;
     if (!await canCreateContent('community')) return;
     if (!postText.trim()) {
       setNotice('Write something before posting.');
       return;
     }
+    publishPostLock.current = true;
     setBusy(true);
     try {
       const imageUrl = postImage ? await uploadImage(postImage) : null;
@@ -785,9 +788,10 @@ export default function App() {
       setPostImage(null);
       setShowPostForm(false);
       setNotice('Your community update is live.');
-    } catch {
-      setNotice('Could not publish your update. Please try again.');
+    } catch (e:any) {
+      setNotice(e?.message || 'Could not publish your update. Please try again.');
     } finally {
+      publishPostLock.current = false;
       setBusy(false);
     }
   };
