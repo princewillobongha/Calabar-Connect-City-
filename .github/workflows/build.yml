@@ -1,7 +1,7 @@
 name: Build Calabar Connect City
 on:
   push:
-    branches: [main]
+    branches: [main, auth-admin-seo-mentions-20261014]
   pull_request:
     branches: [main]
 jobs:
