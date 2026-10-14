@@ -2464,3 +2464,8 @@ html.dark-mode .password-visibility-toggle{color:#d4e2d2}html.dark-mode .admin-s
 .dark-mode .admin-support-search,.dark-mode .admin-kyc-filters button{background:#18231f;border-color:#35443d;color:#e6eee9;}
 .dark-mode .admin-kyc-filters button.active{background:#21865e;color:#fff;}
 @media(max-width:640px){.kyc-gate-modal{padding:24px 18px;}.kyc-gate-actions{flex-direction:column-reverse;}.kyc-gate-actions button{width:100%;}.admin-kyc-filters{gap:6px}.admin-kyc-filters button{padding:8px 10px}}
+
+
+.kyc-gate-status { margin: 16px 0; padding: 14px 16px; border: 1px solid var(--border, #dfe5e0); border-radius: 14px; background: var(--surface-soft, #f4f7f4); }
+.kyc-gate-status p { margin: 6px 0 0; }
+html.dark-mode .kyc-gate-status { background: #202a25; border-color: #435249; color: #e3ebe5; }
