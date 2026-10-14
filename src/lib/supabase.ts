@@ -149,6 +149,16 @@ async function get(path: string) {
     const targetId=publicProfileMatch[1];
     const {data,error}=await supabase.from('profiles').select('id,username,display_name,full_name,avatar_url,bio,city,is_verified,verified_until,verified_days,created_at').eq('id',targetId).single();
     if(error) fail(error.message);
+    let profileData:any=data;
+    if(!profileData.avatar_url){
+      try{
+        const {data:storedImages}=await supabase.storage.from('community-media').list(targetId,{limit:50});
+        const images=(storedImages||[]).filter((file:any)=>file.name&&/\\.(jpe?g|png|webp|gif|avif)$/i.test(file.name));
+        if(images.length===1){
+          profileData={...profileData,avatar_url:supabase.storage.from('community-media').getPublicUrl(targetId+'/'+images[0].name).data.publicUrl};
+        }
+      }catch{}
+    }
     const {data:posts,error:postError}=await supabase.from('community_posts').select('id,text,image_url,created_at,author_id,category').eq('author_id',targetId).order('created_at',{ascending:false}).limit(50);
     if(postError) fail(postError.message);
     const postIds=(posts||[]).map((p:any)=>p.id);
@@ -157,7 +167,7 @@ async function get(path: string) {
     if(followError) fail(followError.message);
     const [{count:followers},{count:following}]=await Promise.all([supabase.from('community_follows').select('*',{count:'exact',head:true}).eq('followed_id',targetId),supabase.from('community_follows').select('*',{count:'exact',head:true}).eq('follower_id',targetId)]);
     const {data:ratings,error:ratingError}=await supabase.from('profile_ratings').select('rating,rater_id').eq('profile_id',targetId); if(ratingError)fail(ratingError.message); const ratingRows=ratings||[]; const ratingAverage=ratingRows.length?ratingRows.reduce((sum:number,r:any)=>sum+Number(r.rating),0)/ratingRows.length:0; const {data:targetVendor}=await supabase.from('vendors').select('id').eq('owner_id',targetId).maybeSingle(); const targetListingsResult:any=targetVendor?await supabase.from('listings').select('id,title,description,price_ngn,category,area,image_urls,created_at,order_count').eq('vendor_id',targetVendor.id).eq('is_available',true).order('created_at',{ascending:false}).limit(50):{data:[],error:null}; if(targetListingsResult.error)fail(targetListingsResult.error.message); const targetListings=targetListingsResult.data; const orders=(targetListings||[]).reduce((sum:number,l:any)=>sum+Number(l.order_count||0),0);
-    return {data:{item:{...data,verified_until:undefined,verified_days:undefined,is_verified:!!data.is_verified&&(!data.verified_until||new Date(data.verified_until).getTime()>Date.now()),rating_average:ratingAverage,rating_count:ratingRows.length,my_rating:ratingRows.find((r:any)=>r.rater_id===user.id)?.rating||0,order_count:orders||0,followers_count:followers||0,following_count:following||0,listings:(targetListings||[]).map((l:any)=>({id:l.id,title:l.title,description:l.description,price:l.price_ngn?String(l.price_ngn):'Ask for price',category:l.category,location:l.area||'Calabar, Cross River',image:Array.isArray(l.image_urls)?l.image_urls[0]||'':l.image_urls||''})),posts:(posts||[]).map((p:any)=>({...p,like_count:(postLikes||[]).filter((x:any)=>x.post_id===p.id).length,liked_by_me:(postLikes||[]).some((x:any)=>x.post_id===p.id&&x.user_id===user.id),share_count:(postShares||[]).filter((x:any)=>x.post_id===p.id).length,shared_by_me:(postShares||[]).some((x:any)=>x.post_id===p.id&&x.user_id===user.id)}))},is_following:!!follow}};
+    return {data:{item:{...profileData,verified_until:undefined,verified_days:undefined,is_verified:!!profileData.is_verified&&(!profileData.verified_until||new Date(profileData.verified_until).getTime()>Date.now()),rating_average:ratingAverage,rating_count:ratingRows.length,my_rating:ratingRows.find((r:any)=>r.rater_id===user.id)?.rating||0,order_count:orders||0,followers_count:followers||0,following_count:following||0,listings:(targetListings||[]).map((l:any)=>({id:l.id,title:l.title,description:l.description,price:l.price_ngn?String(l.price_ngn):'Ask for price',category:l.category,location:l.area||'Calabar, Cross River',image:Array.isArray(l.image_urls)?l.image_urls[0]||'':l.image_urls||''})),posts:(posts||[]).map((p:any)=>({...p,like_count:(postLikes||[]).filter((x:any)=>x.post_id===p.id).length,liked_by_me:(postLikes||[]).some((x:any)=>x.post_id===p.id&&x.user_id===user.id),share_count:(postShares||[]).filter((x:any)=>x.post_id===p.id).length,shared_by_me:(postShares||[]).some((x:any)=>x.post_id===p.id&&x.user_id===user.id)}))},is_following:!!follow}};
   }
   if (path === '/api/profile') {
     const user=await currentUser();
