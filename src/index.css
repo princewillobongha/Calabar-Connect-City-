@@ -2447,3 +2447,20 @@ html.dark-mode .password-visibility-toggle{color:#d4e2d2}html.dark-mode .admin-s
 .dark-mode .group-search-field,.dark-mode .group-create-entry,.dark-mode .group-poll-card,.dark-mode .group-poll-option,.dark-mode .group-action-menu,.dark-mode .admin-kyc-item,.dark-mode .admin-kyc-detail,.dark-mode .kyc-form-card,.dark-mode .kyc-status-card{background:var(--surface,#18251f);color:var(--text,#e7eee9);border-color:var(--line,#34463d)}
 .dark-mode .group-action-menu button{color:var(--text,#e7eee9)}
 @media(max-width:680px){.group-create-entry{align-items:flex-start;flex-direction:column}.group-floating-plus{right:16px;bottom:82px;width:54px;height:54px}.group-action-menu{right:16px;bottom:146px}.kyc-form-grid,.admin-kyc-layout,.admin-kyc-detail dl,.admin-kyc-photos{grid-template-columns:1fr}.admin-kyc-list{max-height:260px}.kyc-form-card,.kyc-status-card{margin:12px 0;padding:18px}.group-poll-card{padding:14px}}
+
+/* KYC gate and admin review usability */
+.kyc-gate-modal{max-width:460px;text-align:center;padding:30px;}
+.kyc-gate-icon{width:58px;height:58px;border-radius:18px;display:grid;place-items:center;margin:0 auto 14px;background:rgba(26,137,92,.12);color:var(--accent,#16845b);}
+.kyc-gate-modal h2{margin:8px 0 10px;}
+.kyc-gate-modal p{line-height:1.65;color:var(--muted,#64748b);}
+.kyc-gate-actions{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:22px;}
+.kyc-gate-actions button{min-width:115px;display:inline-flex;align-items:center;justify-content:center;gap:6px;}
+.admin-support-search{display:flex;align-items:center;gap:8px;padding:10px 12px;margin:12px 0;border:1px solid var(--border,#dce5df);border-radius:12px;background:var(--surface,#fff);color:var(--muted,#64748b);}
+.admin-support-search input{width:100%;min-width:0;border:0;outline:0;background:transparent;color:inherit;}
+.admin-kyc-filters{display:flex;gap:8px;flex-wrap:wrap;margin:16px 0;}
+.admin-kyc-filters button{border:1px solid var(--border,#dce5df);background:var(--surface,#fff);border-radius:999px;padding:9px 13px;color:var(--text,#17231d);display:inline-flex;align-items:center;gap:8px;}
+.admin-kyc-filters button.active{background:var(--accent,#16845b);color:#fff;border-color:var(--accent,#16845b);}
+.admin-kyc-filters button span{font-size:.78em;opacity:.85;}
+.dark-mode .admin-support-search,.dark-mode .admin-kyc-filters button{background:#18231f;border-color:#35443d;color:#e6eee9;}
+.dark-mode .admin-kyc-filters button.active{background:#21865e;color:#fff;}
+@media(max-width:640px){.kyc-gate-modal{padding:24px 18px;}.kyc-gate-actions{flex-direction:column-reverse;}.kyc-gate-actions button{width:100%;}.admin-kyc-filters{gap:6px}.admin-kyc-filters button{padding:8px 10px}}
