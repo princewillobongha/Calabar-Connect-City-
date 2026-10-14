@@ -144,7 +144,8 @@ export default function App() {
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [verificationSearch, setVerificationSearch] = useState('');
   const [recipientId, setRecipientId] = useState('');
-  const [authEmail, setAuthEmail] = useState('');
+  const [authEmail, setAuthEmail] = useState(() => { try { return localStorage.getItem('ccc-auth-email') || ''; } catch { return ''; } });
+  const [authFeedback, setAuthFeedback] = useState('');
   const [authPassword, setAuthPassword] = useState('');
   const [authConfirmPassword, setAuthConfirmPassword] = useState('');
   const [authPasswordVisible, setAuthPasswordVisible] = useState(false);
@@ -196,6 +197,7 @@ export default function App() {
   const [myGroupsOpen, setMyGroupsOpen] = useState(false);
   const [cart, setCart] = useState<Listing[]>(() => { try { return JSON.parse(localStorage.getItem('ccc-cart') || '[]'); } catch { return []; } });
   useEffect(() => { localStorage.setItem('ccc-cart', JSON.stringify(cart)); }, [cart]);
+  useEffect(() => { try { if (authEmail.trim()) localStorage.setItem('ccc-auth-email', authEmail.trim().toLowerCase()); } catch {} }, [authEmail]);
   useEffect(() => {
     const id=user?.userId||user?.id; if(!id) { setUnreadNotifications(0); return; }
     let live=true;
@@ -319,6 +321,8 @@ export default function App() {
     if (!authEmail.trim()) { setNotice('Enter your email address first.'); return; }
     if (authPassword.length < 6) { setNotice('Your password must contain at least 6 characters.'); return; }
     if (authMode === 'signup' && authPassword !== authConfirmPassword) { setNotice('Your passwords do not match. Please check both password fields.'); return; }
+    setAuthFeedback('');
+    setNotice('');
     setBusy(true);
     try {
       const result = await auth.signIn(authEmail.trim(), authPassword, authMode);
@@ -334,7 +338,7 @@ export default function App() {
         setNotice('');
       } else {
         setConfirmationEmail('');
-        setNotice('You are signed in. Welcome to the community!');
+        setNotice(authMode === 'signup' ? 'Account created successfully. You are signed in now.' : 'You are signed in. Welcome to the community!');
       }
     } catch (e: any) {
       const message = typeof e?.message === 'string' ? e.message : '';
@@ -348,15 +352,20 @@ export default function App() {
         setAuthConfirmPassword('');
         setNotice('');
       }
-      if (!needsConfirmation) setNotice(
-        e?.code === 'invalid_credentials'
-          ? 'Email or password is incorrect. If you are new, choose Create an account first.'
-          : e?.code === 'email_not_confirmed'
-            ? 'Your email is not confirmed yet. Open the latest confirmation email and tap its confirmation button.'
-            : /already registered|already been registered|user already exists/i.test(message)
-              ? 'An account already exists with this email. Sign in instead, or request a fresh confirmation email if you have not confirmed it yet.'
-              : message || 'We could not complete authentication. Please check your connection and try again.'
-      );
+      if (!needsConfirmation) {
+        const rateLimited = /rate limit|too many requests|email rate/i.test(message);
+        setAuthFeedback(
+          rateLimited
+            ? 'Email sending is temporarily rate-limited by the authentication service. We tried signing in in case this account is already active. If it is not, wait before requesting another confirmation email; do not keep tapping Create account.'
+            : e?.code === 'invalid_credentials'
+              ? 'Email or password is incorrect. If you are new, choose Create an account first.'
+              : e?.code === 'email_not_confirmed'
+                ? 'Your email is not confirmed yet. Open the latest confirmation email and tap its confirmation button.'
+                : /already registered|already been registered|user already exists/i.test(message)
+                  ? 'An account already exists with this email. Sign in instead, or request a fresh confirmation email if you have not confirmed it yet.'
+                  : message || 'We could not complete authentication. Please check your connection and try again.'
+        );
+      }
     } finally {
       setBusy(false);
     }
@@ -1504,14 +1513,15 @@ export default function App() {
               Sign in to save favourites, publish listings, join groups and
               connect with the community.
             </p>
+            {authFeedback && <div className="auth-feedback" role="alert" aria-live="assertive">{authFeedback}</div>}
             <form className="auth-form" onSubmit={e => { e.preventDefault(); void signIn(); }}>
-              <label>Email address<input type="email" autoComplete="email" required value={authEmail} onChange={e=>setAuthEmail(e.target.value)} placeholder="you@example.com" /></label>
+              <label>Email address<input type="email" autoComplete="email" required value={authEmail} onChange={e=>{setAuthEmail(e.target.value);setAuthFeedback('');}} placeholder="you@example.com" /></label>
               <label>Password<div className="password-input-wrap"><input type={authPasswordVisible?'text':'password'} autoComplete={authMode==='signup'?'new-password':'current-password'} minLength={6} required value={authPassword} onChange={e=>setAuthPassword(e.target.value)} placeholder="At least 6 characters" /><button type="button" className="password-visibility-toggle" onClick={()=>setAuthPasswordVisible(v=>!v)} aria-label={authPasswordVisible?'Hide password':'Show password'} title={authPasswordVisible?'Hide password':'Show password'}>{authPasswordVisible?<EyeOff size={18}/>:<Eye size={18}/>}</button></div></label>
               {authMode==='signup'&&<label>Confirm password<div className="password-input-wrap"><input type={authConfirmVisible?'text':'password'} autoComplete="new-password" minLength={6} required value={authConfirmPassword} onChange={e=>setAuthConfirmPassword(e.target.value)} placeholder="Enter the same password again" /><button type="button" className="password-visibility-toggle" onClick={()=>setAuthConfirmVisible(v=>!v)} aria-label={authConfirmVisible?'Hide confirmation password':'Show confirmation password'} title={authConfirmVisible?'Hide password':'Show password'}>{authConfirmVisible?<EyeOff size={18}/>:<Eye size={18}/>}</button></div></label>}
               <button className="primary-btn full-btn" type="submit" disabled={busy}><LogIn size={17} /> {busy ? 'Please wait…' : authMode==='signup'?'Create account':'Sign in securely'}</button>
             </form>
             <small className="fine-print">{authMode==='signup'?'Create your free Calabar Connect City account.':'Sign in to save favourites, publish listings and connect.'}</small>
-            <button type="button" className="text-link auth-switch" onClick={()=>{setAuthMode(m=>m==='signin'?'signup':'signin');setAuthConfirmPassword('');setAuthPasswordVisible(false);setAuthConfirmVisible(false);}}>{authMode==='signup'?'Already have an account? Sign in':'New here? Create an account'}</button>
+            <button type="button" className="text-link auth-switch" onClick={()=>{setAuthMode(m=>m==='signin'?'signup':'signin');setAuthFeedback('');setAuthConfirmPassword('');setAuthPasswordVisible(false);setAuthConfirmVisible(false);}}>{authMode==='signup'?'Already have an account? Sign in':'New here? Create an account'}</button>
           </div>
         </div>
       )}
