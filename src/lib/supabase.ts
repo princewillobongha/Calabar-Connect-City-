@@ -2,6 +2,8 @@ import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined;
+// Always send confirmation links back to the stable production domain, not a temporary preview URL.
+const authRedirectUrl = 'https://calabar-connect-city-omega.vercel.app/';
 export const supabase = createClient(
   supabaseUrl || 'https://moejannssmjupdvkcofw.supabase.co',
   supabaseKey || 'sb_publishable_60YiAMNciYl-5UjEj0jYFA_LajRkki3',
@@ -10,6 +12,10 @@ export const supabase = createClient(
 
 const fail = (message: string): never => { throw new Error(message); };
 const ensure = <T,>(data: T | null, error: any): T => { if (error) fail(error.message || 'Supabase request failed'); return data as T; };
+const withTimeout = <T,>(operation: PromiseLike<T>, ms = 25000): Promise<T> => new Promise((resolve, reject) => {
+  const timer = window.setTimeout(() => reject(new Error('This request is taking longer than expected. Check your connection. If you were creating an account, wait a moment before trying again, or request a fresh confirmation email.')), ms);
+  Promise.resolve(operation).then(value => { window.clearTimeout(timer); resolve(value); }, error => { window.clearTimeout(timer); reject(error); });
+});
 const currentUser = async () => {
   const { data, error } = await supabase.auth.getUser();
   if (error || !data.user) fail('Please sign in to continue.');
@@ -90,6 +96,13 @@ async function get(path: string) {
       const message='Hi '+(profile?.display_name||profile?.username||'seller')+', I found your listing "'+(listing as any).title+'" on Calabar Connect City ('+price+'). I am interested. Is it available? Please share the next steps. Thank you.';
       const {error:orderError}=await supabase.from('vendor_enquiries').insert({vendor_id:(listing as any).vendor_id,customer_id:customer.id,listing_id:(listing as any).id,message,status:'new'});
       if(orderError) fail(orderError.message);
+      // A contact is an enquiry, not a confirmed order. Give the seller a tappable listing notification.
+      try {
+        if(ownerId) {
+          const {data:customerProfile}=await supabase.from('profiles').select('display_name,username').eq('id',customer.id).maybeSingle();
+          await supabase.from('notifications').insert({user_id:ownerId,actor_id:customer.id,kind:'listing_enquiry',title:'New listing enquiry',body:(customerProfile?.display_name||customerProfile?.username||'A member')+' contacted you about "'+(listing as any).title+'". This is an enquiry, not a confirmed order.',target_url:'listing://'+(listing as any).id});
+        }
+      } catch { /* The enquiry remains saved even if a notification cannot be delivered. */ }
       return {data:{url:url+'?text='+encodeURIComponent(message)}};
     }
     return {data:{url}};
@@ -374,9 +387,9 @@ async function post(path: string, body: any) {
     else fail('This report type cannot be removed automatically. Review the profile report manually.');
     if(removeError)fail(removeError.message);
     if(!removed?.length)fail('No reported content was removed. It may already be deleted or access was blocked.');
-    const {error:statusError}=await supabase.from('moderation_reports').update({status:'resolved',reviewed_at:new Date().toISOString()}).eq('id',report.id);
-    if(statusError)fail(statusError.message);
-    return {data:{ok:true}};
+    const {error:deleteReportError}=await supabase.from('moderation_reports').delete().eq('id',report.id);
+    if(deleteReportError)fail('Content was removed, but the report could not be permanently deleted: '+deleteReportError.message);
+    return {data:{ok:true,reportDeleted:true}};
   }
   const reportDeleteMatch=path.match(/^\/api\/admin\/reports\/([^/]+)\/delete$/);
   if(reportDeleteMatch){
@@ -562,15 +575,16 @@ export const auth = {
   },
   async signIn(email?:string,password?:string,mode:'signin'|'signup'='signin'){
     if(!email||!password) throw new Error('Enter your email and password.');
-    const result=mode==='signup'
-      ? await supabase.auth.signUp({email,password,options:{data:{display_name:'Calabar Member'},emailRedirectTo:window.location.origin + '/'}})
-      : await supabase.auth.signInWithPassword({email,password});
+    const normalizedEmail=email.trim().toLowerCase();
+    const result=await withTimeout(mode==='signup'
+      ? supabase.auth.signUp({email:normalizedEmail,password,options:{data:{display_name:'Calabar Member'},emailRedirectTo:authRedirectUrl}})
+      : supabase.auth.signInWithPassword({email:normalizedEmail,password}),25000);
     if(result.error)throw result.error;
     if(!result.data.user)throw new Error('Could not complete authentication.');
     if(mode==='signup'&&!result.data.session) return {user:{userId:result.data.user.id,email:result.data.user.email,name:profileName(result.data.user)},confirmationRequired:true};
     return {user:{userId:result.data.user.id,email:result.data.user.email,name:profileName(result.data.user)}};
   },
-  async resendConfirmation(email:string){const {error}=await supabase.auth.resend({type:'signup',email,options:{emailRedirectTo:window.location.origin + '/'}});if(error)throw error;},
+  async resendConfirmation(email:string){const {error}=await withTimeout(supabase.auth.resend({type:'signup',email:email.trim().toLowerCase(),options:{emailRedirectTo:authRedirectUrl}}),25000);if(error)throw error;},
   async signOut(){const {error}=await supabase.auth.signOut();if(error)throw error;}
 };
 async function del(path:string){
