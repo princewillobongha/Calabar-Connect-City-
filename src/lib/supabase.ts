@@ -69,9 +69,9 @@ async function get(path: string) {
   if (path === '/api/listings') {
     const {data,error}=await supabase.from('listings').select('*, vendor:vendors(id,owner_id,business_name,address,area,cover_image_url)').eq('is_available',true).order('created_at',{ascending:false}).limit(100);
     const rows=ensure(data,error); const ownerIds=[...new Set(rows.map((x:any)=>x.vendor?.owner_id).filter(Boolean))];
-    const {data:owners,error:ownerError}=ownerIds.length?await supabase.from('profiles').select('id,username,display_name,is_verified,verified_until').in('id',ownerIds):{data:[],error:null}; if(ownerError)fail(ownerError.message);
+    const ownersResult:any=ownerIds.length?await supabase.from('profiles').select('id,username,display_name,is_verified,verified_until').in('id',ownerIds):{data:[],error:null};const {data:owners,error:ownerError}=ownersResult; if(ownerError)fail(ownerError.message);
     const ownerMap=new Map((owners||[]).map((p:any)=>[p.id,p]));
-    const {data:ratings,error:ratingsError}=ownerIds.length?await supabase.from('profile_ratings').select('profile_id,rating').in('profile_id',ownerIds):{data:[],error:null};
+    const ratingsResult:any=ownerIds.length?await supabase.from('profile_ratings').select('profile_id,rating').in('profile_id',ownerIds):{data:[],error:null};const {data:ratings,error:ratingsError}=ratingsResult;
     if(ratingsError) fail(ratingsError.message);
     const ratingMap=new Map<string,{sum:number,count:number}>();
     for(const rating of (ratings||[]) as any[]){const entry=ratingMap.get(rating.profile_id)||{sum:0,count:0};entry.sum+=Number(rating.rating);entry.count++;ratingMap.set(rating.profile_id,entry);}
@@ -111,11 +111,11 @@ async function get(path: string) {
     const {data:memberRows,error:membersError}=await supabase.from('group_members').select('user_id,role,status,joined_at').eq('group_id',groupId).eq('status','active');
     if(membersError) fail(membersError.message);
     const ids=[...new Set([...(posts||[]).map((p:any)=>p.author_id),...(memberRows||[]).map((m:any)=>m.user_id)])];
-    const {data:profiles,error:profilesError}=ids.length?await supabase.from('profiles').select('id,username,display_name,avatar_url,is_verified,verified_until').in('id',ids):{data:[],error:null};
+    const profilesResult:any=ids.length?await supabase.from('profiles').select('id,username,display_name,avatar_url,is_verified,verified_until').in('id',ids):{data:[],error:null};const {data:profiles,error:profilesError}=profilesResult;
     if(profilesError) fail(profilesError.message);
     const {data:{user:viewer}}=await supabase.auth.getUser();
     const postIds=(posts||[]).map((p:any)=>p.id);
-    const {data:groupLikes,error:likesError}=postIds.length?await supabase.from('community_group_post_reactions').select('post_id,user_id').in('post_id',postIds):{data:[],error:null};
+    const groupLikesResult:any=postIds.length?await supabase.from('community_group_post_reactions').select('post_id,user_id').in('post_id',postIds):{data:[],error:null};const {data:groupLikes,error:likesError}=groupLikesResult;
     if(likesError) fail(likesError.message);
     const isMember=!!viewer&&(memberRows||[]).some((m:any)=>m.user_id===viewer.id);
     const profileMap=new Map((profiles||[]).map((p:any)=>[p.id,p]));
@@ -212,7 +212,7 @@ async function get(path: string) {
     const latestByUser=new Map<string,any>();
     for(const row of rows){if(!latestByUser.has(row.user_id))latestByUser.set(row.user_id,row);}
     const ids=[...latestByUser.keys()];
-    const {data:profiles,error:profileError}=ids.length?await supabase.from('profiles').select('id,username,display_name,avatar_url').in('id',ids):{data:[],error:null};
+    const profilesResult:any=ids.length?await supabase.from('profiles').select('id,username,display_name,avatar_url').in('id',ids):{data:[],error:null};const {data:profiles,error:profileError}=profilesResult;
     if(profileError)fail(profileError.message);
     const pm=new Map((profiles||[]).map((p:any)=>[p.id,p]));
     return {data:{items:[...latestByUser.entries()].map(([userId,last]:any)=>({user_id:userId,last_message:last,profile:pm.get(userId)||{},waiting_for_admin:last.sender_role==='member'})).sort((a:any,b:any)=>Date.parse(b.last_message.created_at)-Date.parse(a.last_message.created_at))}};
@@ -237,7 +237,7 @@ async function get(path: string) {
     const {data,error}=await supabase.from('notifications').select('*').eq('user_id',user.id).order('created_at',{ascending:false}).limit(150);
     const rows=ensure(data,error);
     const actorIds=[...new Set(rows.filter((n:any)=>n.actor_id).map((n:any)=>n.actor_id))];
-    const {data:actors,error:actorError}=actorIds.length?await supabase.from('profiles').select('id,display_name,username').in('id',actorIds):{data:[],error:null};
+    const actorsResult:any=actorIds.length?await supabase.from('profiles').select('id,display_name,username').in('id',actorIds):{data:[],error:null};const {data:actors,error:actorError}=actorsResult;
     if(actorError) fail(actorError.message);
     const actorMap=new Map((actors||[]).map((p:any)=>[p.id,p]));
     const normalized=rows.map((n:any)=>{
@@ -297,7 +297,7 @@ async function get(path: string) {
     const contentRows=[...(communityTargets.data||[]),...(groupTargets.data||[])];
     const listingRows=listingTargets.data||[];
     const targetProfileIds=[...new Set([...contentRows.map((x:any)=>x.author_id),...listingRows.map((x:any)=>x.vendor?.owner_id)].filter(Boolean))];
-    const {data:targetProfiles,error:targetProfileError}=targetProfileIds.length?await supabase.from('profiles').select('id,username,display_name,avatar_url').in('id',targetProfileIds):{data:[],error:null};
+    const targetProfilesResult:any=targetProfileIds.length?await supabase.from('profiles').select('id,username,display_name,avatar_url').in('id',targetProfileIds):{data:[],error:null};const {data:targetProfiles,error:targetProfileError}=targetProfilesResult;
     if(targetProfileError)fail(targetProfileError.message);
     const pm=new Map((reporters.data||[]).map((p:any)=>[p.id,p]));
     const tpm=new Map([...(profileTargets.data||[]),...(targetProfiles||[])].map((p:any)=>[p.id,p]));
@@ -360,7 +360,7 @@ async function post(path: string, body: any) {
     if(!data) fail('This report was not found or has already been permanently deleted.');
     return {data:{ok:true,permanentlyDeleted:true}};
   }
-  const activeRestriction=async (restrictionType:string) => {
+  const activeRestriction=async (restrictionType:string): Promise<any> => {
     if(adminEmail) return null;
     const {data,error}=await supabase.from('member_restrictions').select('restriction_type,reason,expires_at').eq('user_id',user.id).is('deleted_at',null);
     if(error) fail(error.message);
