@@ -338,7 +338,7 @@ export default function App() {
         setNotice('');
       } else {
         setConfirmationEmail('');
-        setNotice(authMode === 'signup' ? 'Account created successfully. You are signed in now.' : 'You are signed in. Welcome to the community!');
+        setNotice((result as any).existingAccountSignedIn ? 'You are signed in. Welcome back!' : authMode === 'signup' ? 'Account created successfully. You are signed in now.' : 'You are signed in. Welcome to the community!');
       }
     } catch (e: any) {
       const message = typeof e?.message === 'string' ? e.message : '';
