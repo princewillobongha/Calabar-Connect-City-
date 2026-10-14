@@ -368,13 +368,13 @@ async function post(path: string, body: any) {
     if(statusError)fail(statusError.message);
     return {data:{ok:true}};
   }
-  const reportDeleteMatch=path.match(/^\/api\/admin\/reports\/([^/]+)\/(delete|restore)$/);
+  const reportDeleteMatch=path.match(/^\/api\/admin\/reports\/([^/]+)\/delete$/);
   if(reportDeleteMatch){
     if((user.email||'').toLowerCase()!=='princewillobongha@gmail.com')fail('Admin access required.');
-    const isRestore=reportDeleteMatch[2]==='restore';
-    const patch=isRestore?{deleted_at:null,deleted_by:null}:{deleted_at:new Date().toISOString(),deleted_by:user.id};
-    const {data,error}=await supabase.from('moderation_reports').update(patch).eq('id',reportDeleteMatch[1]).select('id,deleted_at').single();
-    return {data:{item:ensure(data,error)}};
+    const {data,error}=await supabase.from('moderation_reports').delete().eq('id',reportDeleteMatch[1]).select('id').maybeSingle();
+    if(error)fail(error.message);
+    if(!data)fail('Report not found or already permanently deleted.');
+    return {data:{ok:true}};
   }
   const reportResolveMatch=path.match(/^\/api\/admin\/reports\/([^/]+)\/resolve$/);
   if(reportResolveMatch){
