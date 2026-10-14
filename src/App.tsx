@@ -1348,7 +1348,6 @@ export default function App() {
                 </div>
               </div>
               <ListingGrid
-                  onRate={(item,rating)=>void rateListingVendor(item,rating)}
                   onMarkSold={markListingSold}
                 items={listings.filter(
                   l => l.category === 'Jobs' || l.kind === 'Job'
