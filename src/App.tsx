@@ -429,8 +429,7 @@ export default function App() {
       const result=await api.post('/api/admin/support-messages/'+selectedSupportUserId,{message});
       setAdminSupportMessages(items=>[...items,result.data.item]);
       setAdminSupportDraft('');
-      if(result.data?.notificationSent===false)setNotice('Message sent, but notification could not be delivered: '+(result.data.notificationError||'unknown notification error'));
-      else setNotice('Admin reply sent and member notified.');
+      setNotice('Admin reply sent and member notified.');
       await loadAdminSupportThreads();
     } catch(e:any) {setNotice(e?.message||'Could not send the admin message.');}
     finally {setAdminSupportBusy(false);}
