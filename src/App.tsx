@@ -166,7 +166,7 @@ export default function App() {
   const [peopleQuery, setPeopleQuery] = useState('');
   const [people, setPeople] = useState<any[]>([]);
   const [showAdmin, setShowAdmin] = useState(false);
-  const [adminSection, setAdminSection] = useState<'home'|'members'|'safety'|'marketplace'|'announcements'|'messages'>('home');
+  const [adminSection, setAdminSection] = useState<'home'|'members'|'safety'|'marketplace'|'announcements'|'messages'|'kyc'>('home');
   const [adminRestrictionTargetId, setAdminRestrictionTargetId] = useState('');
   const [adminSupportThreads,setAdminSupportThreads]=useState<any[]>([]);
   const [selectedSupportUserId,setSelectedSupportUserId]=useState('');
@@ -202,6 +202,24 @@ export default function App() {
   const [selectedGroup, setSelectedGroup] = useState<any>(null);
   const [groupPostText, setGroupPostText] = useState('');
   const [groupPostImage, setGroupPostImage] = useState<File|null>(null);
+  const [groupSearchQuery, setGroupSearchQuery] = useState('');
+  const [showGroupActionMenu, setShowGroupActionMenu] = useState(false);
+  const [showGroupComposer, setShowGroupComposer] = useState(false);
+  const [showPollForm, setShowPollForm] = useState(false);
+  const [pollQuestion, setPollQuestion] = useState('');
+  const [pollOptions, setPollOptions] = useState(['','']);
+  const [pollBusy, setPollBusy] = useState(false);
+  const [kycSubmission, setKycSubmission] = useState<any>(null);
+  const [kycLoading, setKycLoading] = useState(false);
+  const [kycBusy, setKycBusy] = useState(false);
+  const [kycForm, setKycForm] = useState({first_name:'',last_name:'',address:'',phone_number:'',date_of_birth:'',business_name:'',nin:'',location:'Calabar, Cross River State'});
+  const [ninCardFile, setNinCardFile] = useState<File|null>(null);
+  const [facePhotoFile, setFacePhotoFile] = useState<File|null>(null);
+  const [adminKycItems, setAdminKycItems] = useState<any[]>([]);
+  const [selectedAdminKyc, setSelectedAdminKyc] = useState<any>(null);
+  const [adminKycImageUrls, setAdminKycImageUrls] = useState<{nin:string;face:string}>({nin:'',face:''});
+  const [adminKycNote, setAdminKycNote] = useState('');
+  const [adminKycBusy, setAdminKycBusy] = useState(false);
   const [selectedPost, setSelectedPost] = useState<any>(null);
   const [selectedPostComments, setSelectedPostComments] = useState<any[]>([]);
   const [commentDraft, setCommentDraft] = useState('');
@@ -227,7 +245,7 @@ export default function App() {
     const channel=supabase.channel('calabar-notifications-'+id).on('postgres_changes',{event:'INSERT',schema:'public',table:'notifications',filter:'user_id=eq.'+id},()=>{void refresh();}).subscribe();
     return ()=>{live=false;void supabase.removeChannel(channel);};
   },[user?.userId,user?.id,memberPanel]);
-  const overlayStates = { showAuth, showProfile, showAbout, showListingForm, showPostForm, showGroupForm, showCart, showPeople, showAdmin, showSubscriptions, showUserSupportChat, publicProfile:!!publicProfile, selectedListing:!!selectedListing, selectedPost:!!selectedPost, myGroupsOpen };
+  const overlayStates = { showAuth, showProfile, showAbout, showListingForm, showPostForm, showGroupForm, showGroupComposer, showPollForm, showCart, showPeople, showAdmin, showSubscriptions, showUserSupportChat, publicProfile:!!publicProfile, selectedListing:!!selectedListing, selectedPost:!!selectedPost, myGroupsOpen };
   const previousOverlayRef = useRef<Record<string, boolean>>({});
   useEffect(() => {
     const previous = previousOverlayRef.current;
@@ -250,9 +268,11 @@ export default function App() {
     if (newlyOpened !== 'selectedPost') setSelectedPost(null);
     if (newlyOpened !== 'myGroupsOpen') setMyGroupsOpen(false);
     setMemberPanel(null);
-  }, [showAuth, showProfile, showAbout, showListingForm, showPostForm, showGroupForm, showCart, showPeople, showAdmin, showSubscriptions, showUserSupportChat, publicProfile, selectedListing, selectedPost, myGroupsOpen]);
-  useEffect(()=>{const anyModal=showAuth||showProfile||showAbout||showListingForm||showPostForm||showGroupForm||showCart||showPeople||showAdmin||showSubscriptions||showUserSupportChat||!!publicProfile||!!selectedListing||!!selectedPost||myGroupsOpen;document.body.style.overflow=anyModal?'hidden':'';const onKey=(e:KeyboardEvent)=>{if(e.key==='Escape'){setShowAuth(false);setShowProfile(false);setShowAbout(false);setShowListingForm(false);setShowPostForm(false);setShowGroupForm(false);setShowCart(false);setShowPeople(false);setShowAdmin(false);setShowSubscriptions(false);setShowUserSupportChat(false);setPublicProfile(null);setSelectedListing(null);setSelectedPost(null);setMyGroupsOpen(false);}};window.addEventListener('keydown',onKey);return()=>{document.body.style.overflow='';window.removeEventListener('keydown',onKey);};},[showAuth,showProfile,showAbout,showListingForm,showPostForm,showGroupForm,showCart,showPeople,showAdmin,showSubscriptions,publicProfile,selectedListing,selectedPost,myGroupsOpen]);
-  useEffect(()=>{setSelectedListing(null);setSelectedPost(null);setPublicProfile(null);setShowAuth(false);setShowProfile(false);setShowAbout(false);setShowListingForm(false);setShowPostForm(false);setShowGroupForm(false);setShowCart(false);setShowPeople(false);setShowAdmin(false);setShowSubscriptions(false);setMyGroupsOpen(false);setMemberPanel(null);setMenuOpen(false);},[active]);
+  }, [showAuth, showProfile, showAbout, showListingForm, showPostForm, showGroupForm, showGroupComposer, showPollForm, showCart, showPeople, showAdmin, showSubscriptions, showUserSupportChat, publicProfile, selectedListing, selectedPost, myGroupsOpen]);
+  useEffect(()=>{const anyModal=showAuth||showProfile||showAbout||showListingForm||showPostForm||showGroupForm||showGroupComposer||showPollForm||showCart||showPeople||showAdmin||showSubscriptions||showUserSupportChat||!!publicProfile||!!selectedListing||!!selectedPost||myGroupsOpen;document.body.style.overflow=anyModal?'hidden':'';const onKey=(e:KeyboardEvent)=>{if(e.key==='Escape'){setShowAuth(false);setShowProfile(false);setShowAbout(false);setShowListingForm(false);setShowPostForm(false);setShowGroupForm(false);setShowGroupComposer(false);setShowPollForm(false);setShowCart(false);setShowPeople(false);setShowAdmin(false);setShowSubscriptions(false);setShowUserSupportChat(false);setPublicProfile(null);setSelectedListing(null);setSelectedPost(null);setMyGroupsOpen(false);}};window.addEventListener('keydown',onKey);return()=>{document.body.style.overflow='';window.removeEventListener('keydown',onKey);};},[showAuth,showProfile,showAbout,showListingForm,showPostForm,showGroupForm,showGroupComposer,showPollForm,showCart,showPeople,showAdmin,showSubscriptions,publicProfile,selectedListing,selectedPost,myGroupsOpen]);
+  useEffect(()=>{setSelectedListing(null);setSelectedPost(null);setPublicProfile(null);setShowAuth(false);setShowProfile(false);setShowAbout(false);setShowListingForm(false);setShowPostForm(false);setShowGroupForm(false);setShowGroupComposer(false);setShowPollForm(false);setShowGroupActionMenu(false);setShowCart(false);setShowPeople(false);setShowAdmin(false);setShowSubscriptions(false);setMyGroupsOpen(false);setMemberPanel(null);setMenuOpen(false);},[active]);
+  useEffect(()=>{if(active==='Marketplace')setListings(items=>shuffleList(items));},[active]);
+  useEffect(()=>{if(active==='KYC'&&user)void loadKycStatus();},[active,user?.userId,user?.id]);
   useEffect(()=>{if(active!=='Businesses')return;let live=true;api.get('/api/discover/businesses').then(r=>{if(live)setBusinesses(r.data?.items||[]);}).catch((e:any)=>{if(live)setNotice(e?.message||'Could not load local businesses.');});return()=>{live=false;};},[active]);
   useEffect(() => {
     let live = true;
@@ -274,7 +294,7 @@ export default function App() {
       setListings(remoteListings);
       const remoteGroups = g.data?.items || [];
       setGroups(remoteGroups);
-      setPosts(p.data?.items || []);
+      setPosts(Array.from(new Map((p.data?.items || []).map((item:any)=>[item.id,item])).values()) as Post[]);
       setLoading(false);
     });
     return () => {
@@ -630,9 +650,11 @@ export default function App() {
       }
     }
   };
-  const openGroup = async (group:any) => { setActive('Groups');setSelectedGroup({...group,loading:true,load_error:''});try{const r=await api.get('/api/groups/'+group.id);setSelectedGroup({...group,...(r.data?.item||{}),loading:false,load_error:''});}catch(e:any){const message=e?.message||'Could not load this group. Tap Retry to try again.';setSelectedGroup({...group,loading:false,load_error:message});setNotice(message);} };
+  const openGroup = async (group:any) => { setActive('Groups');setSelectedGroup({...group,loading:true,load_error:''});try{const r=await api.get('/api/groups/'+group.id);const detail={...group,...(r.data?.item||{})};const {data:pollRows,error:pollError}=await supabase.from('community_group_polls').select('*').eq('group_id',group.id).order('created_at',{ascending:false}).limit(50);if(pollError)throw pollError;const pollIds=(pollRows||[]).map((p:any)=>p.id);const {data:voteRows,error:voteError}=pollIds.length?await supabase.from('community_group_poll_votes').select('poll_id,user_id,option_index').in('poll_id',pollIds):{data:[],error:null};if(voteError)throw voteError;const viewerId=user?.userId||user?.id;const polls=(pollRows||[]).map((p:any)=>{const votes=(voteRows||[]).filter((v:any)=>v.poll_id===p.id);const counts=(Array.isArray(p.options)?p.options:[]).map((_:any,i:number)=>votes.filter((v:any)=>v.option_index===i).length);return {...p,vote_counts:counts,total_votes:votes.length,my_vote:votes.find((v:any)=>v.user_id===viewerId)?.option_index};});setSelectedGroup({...detail,polls,loading:false,load_error:''});}catch(e:any){const message=e?.message||'Could not load this group. Tap Retry to try again.';setSelectedGroup({...group,loading:false,load_error:message});setNotice(message);} };
   const joinGroup = async (group:any) => {if(!requireMember('Sign in to join a group.'))return;try{await api.post('/api/groups/'+group.id+'/join',{});await openGroup(group);setNotice('You joined '+group.name+'.');}catch(e:any){setNotice(e?.message||'Could not join this group.');}};
-  const createGroupPost = async () => {if(!selectedGroup||!requireMember('Sign in to post in this group.'))return;if(!await canCreateContent('groups'))return;if(!groupPostText.trim()){setNotice('Write something before posting.');return;}setBusy(true);try{const image_url=groupPostImage?await uploadImage(groupPostImage):null;await api.post('/api/groups/'+selectedGroup.id+'/posts',{text:groupPostText.trim(),image_url});setGroupPostText('');setGroupPostImage(null);await openGroup(selectedGroup);setNotice('Your group post is published.');}catch(e:any){setNotice(e?.message||'Could not publish in this group.');}finally{setBusy(false);}};
+  const createGroupPost = async () => {if(busy||!selectedGroup||!requireMember('Sign in to post in this group.'))return;if(!await canCreateContent('groups'))return;if(!groupPostText.trim()&&!groupPostImage){setNotice('Write something or add a photo before posting.');return;}setBusy(true);try{const image_url=groupPostImage?await uploadImage(groupPostImage):null;await api.post('/api/groups/'+selectedGroup.id+'/posts',{text:groupPostText.trim(),image_url});setGroupPostText('');setGroupPostImage(null);setShowGroupComposer(false);setShowGroupActionMenu(false);await openGroup(selectedGroup);setNotice('Your group post is published.');}catch(e:any){setNotice(e?.message||'Could not publish in this group.');}finally{setBusy(false);}};
+  const createGroupPoll = async () => {if(pollBusy||!selectedGroup||!requireMember('Sign in to create a poll.'))return;const question=pollQuestion.trim();const options=pollOptions.map(x=>x.trim()).filter(Boolean);if(question.length<3){setNotice('Add a poll question of at least 3 characters.');return;}if(options.length<2||new Set(options.map(x=>x.toLowerCase())).size!==options.length){setNotice('Add at least two different poll options.');return;}if(options.some(x=>x.length>120)){setNotice('Each poll option must be 120 characters or fewer.');return;}setPollBusy(true);try{const {error}=await supabase.from('community_group_polls').insert({group_id:selectedGroup.id,created_by:user?.userId||user?.id,question,options});if(error)throw error;setPollQuestion('');setPollOptions(['','']);setShowPollForm(false);setShowGroupActionMenu(false);await openGroup(selectedGroup);setNotice('Your poll has been published.');}catch(e:any){setNotice(e?.message||'Could not publish this poll.');}finally{setPollBusy(false);}};
+  const voteGroupPoll = async (poll:any, optionIndex:number) => {if(!requireMember('Sign in to vote in a poll.'))return;try{const {error}=await supabase.from('community_group_poll_votes').upsert({poll_id:poll.id,user_id:user?.userId||user?.id,option_index:optionIndex},{onConflict:'poll_id,user_id'});if(error)throw error;await openGroup(selectedGroup);setNotice('Your vote has been saved.');}catch(e:any){setNotice(e?.message||'Could not save your vote.');}};
   const deleteGroupPost = async (post:any) => {if(!selectedGroup||!window.confirm('Delete this post from the group?'))return;try{await api.delete('/api/groups/'+selectedGroup.id+'/posts/'+post.id);await openGroup(selectedGroup);setNotice('Group post deleted.');}catch(e:any){setNotice(e?.message||'Could not delete this group post.');}};
   const removeGroupMember = async (member:any) => {if(!selectedGroup||!window.confirm('Remove this member from the group?'))return;try{await api.delete('/api/groups/'+selectedGroup.id+'/members/'+member.user_id);await openGroup(selectedGroup);setNotice('Member removed from the group.');}catch(e:any){setNotice(e?.message||'Could not remove this member.');}};
   const openPost = async (post:any) => {setCommentDraft('');setSelectedPostComments([]);setSelectedPost(post);};
@@ -691,6 +713,7 @@ export default function App() {
   };
   const saveListing = async () => {
     if (!requireMember('Sign in to publish a listing.')) return;
+    if (kycSubmission?.status !== 'approved') { setShowListingForm(false); setActive('KYC'); setNotice('You must pass KYC before you can publish a marketplace listing.'); return; }
     if (!await canCreateContent('marketplace')) return;
     if (!form.title.trim() || !form.description.trim()) {
       setNotice('Add a title and description first.');
@@ -740,6 +763,7 @@ export default function App() {
     }
   };
   const publishPost = async () => {
+    if (busy) return;
     if (!requireMember('Sign in to join the conversation.')) return;
     if (!await canCreateContent('community')) return;
     if (!postText.trim()) {
@@ -756,7 +780,7 @@ export default function App() {
         category: 'Community',
         created_at: new Date().toISOString(),
       });
-      setPosts(prev => [r.data.item, ...prev]);
+      setPosts(prev => [r.data.item, ...prev.filter((item:any)=>item.id!==r.data.item.id)]);
       setPostText('');
       setPostImage(null);
       setShowPostForm(false);
@@ -782,6 +806,7 @@ export default function App() {
     setMemberPanel(null);
     setMenuOpen(false);
     const target=String(item?.target_url||'');
+    if (target.startsWith('kyc://')) { setActive('KYC'); setNotice('Your KYC status is shown here.'); return; }
     if (target.startsWith('admin-message://')) {
       const targetId=target.slice('admin-message://'.length);
       if((user?.email||'').toLowerCase()==='princewillobongha@gmail.com'){
@@ -872,6 +897,12 @@ export default function App() {
     setNotice('You are signed in. Use the People directory and Connections tools to connect with members.');
   };
   const nav = ['Discover', 'Marketplace', 'Community', 'Groups', 'Businesses', 'Jobs'];
+  const kycApproved = kycSubmission?.status === 'approved';
+  const loadKycStatus = async () => {if(!user){setKycSubmission(null);return;}setKycLoading(true);try{const {data,error}=await supabase.from('kyc_submissions').select('*').eq('user_id',user.userId||user.id).maybeSingle();if(error)throw error;setKycSubmission(data||null);if(data?.status==='rejected')setKycForm((v:any)=>({...v,first_name:data.first_name||v.first_name,last_name:data.last_name||v.last_name,address:data.address||v.address,phone_number:data.phone_number||v.phone_number,date_of_birth:data.date_of_birth||v.date_of_birth,business_name:data.business_name||v.business_name,nin:data.nin||v.nin,location:data.location||v.location}));}catch(e:any){setNotice(e?.message||'Could not load your KYC status.');}finally{setKycLoading(false);}};
+  const submitKyc = async () => {if(!requireMember('Sign in to submit KYC.'))return;if(kycBusy)return;const v=kycForm;if(!v.first_name.trim()||!v.last_name.trim()||!v.address.trim()||!v.phone_number.trim()||!v.date_of_birth||!v.business_name.trim()||!/^\\d{11}$/.test(v.nin.trim())||!v.location.toLowerCase().includes('calabar')){setNotice('Complete every field, enter an 11-digit NIN, and confirm your location is in Calabar.');return;}if(!ninCardFile||!facePhotoFile){setNotice('Upload a clear NIN card photo and a clear face photo.');return;}for(const f of [ninCardFile,facePhotoFile])if(!['image/jpeg','image/png','image/webp'].includes(f.type)||f.size>5*1024*1024){setNotice('Use JPG, PNG or WEBP images no larger than 5 MB each.');return;}setKycBusy(true);try{const uid=user.userId||user.id;const uploadPrivate=async(file:File,prefix:string)=>{const ext=(file.name.split('.').pop()||'jpg').replace(/[^a-z0-9]/gi,'').toLowerCase();const path=uid+'/'+prefix+'-'+crypto.randomUUID()+'.'+ext;const {error}=await supabase.storage.from('kyc-documents').upload(path,file,{upsert:false,contentType:file.type});if(error)throw error;return path;};const ninPath=await uploadPrivate(ninCardFile,'nin-card');let facePath='';try{facePath=await uploadPrivate(facePhotoFile,'face-photo');}catch(e){await supabase.storage.from('kyc-documents').remove([ninPath]);throw e;}const payload={user_id:uid,first_name:v.first_name.trim(),last_name:v.last_name.trim(),address:v.address.trim(),phone_number:v.phone_number.trim(),date_of_birth:v.date_of_birth,business_name:v.business_name.trim(),nin:v.nin.trim(),location:v.location.trim(),nin_card_path:ninPath,face_photo_path:facePath,status:'pending',admin_note:null,reviewed_by:null,reviewed_at:null,updated_at:new Date().toISOString()};const result=kycSubmission?.status==='rejected'?await supabase.from('kyc_submissions').update(payload).eq('user_id',uid).eq('status','rejected').select('*').single():await supabase.from('kyc_submissions').insert(payload).select('*').single();if(result.error)throw result.error;setKycSubmission(result.data);setNinCardFile(null);setFacePhotoFile(null);setNotice('Your KYC has been submitted for admin review.');}catch(e:any){setNotice(e?.message||'Could not submit KYC. Please check your connection and try again.');}finally{setKycBusy(false);}};
+  const loadAdminKyc = async () => {if(!isAdmin){setNotice('Admin access required.');return;}try{const {data,error}=await supabase.from('kyc_submissions').select('*').order('created_at',{ascending:false}).limit(200);if(error)throw error;setAdminKycItems(data||[]);setAdminSection('kyc');setSelectedAdminKyc(null);setAdminKycImageUrls({nin:'',face:''});}catch(e:any){setNotice(e?.message||'Could not load KYC submissions.');}};
+  const openAdminKycDetail = async (item:any) => {setSelectedAdminKyc(item);setAdminKycNote(item.admin_note||'');try{const [n,f]=await Promise.all([supabase.storage.from('kyc-documents').createSignedUrl(item.nin_card_path,300),supabase.storage.from('kyc-documents').createSignedUrl(item.face_photo_path,300)]);if(n.error)throw n.error;if(f.error)throw f.error;setAdminKycImageUrls({nin:n.data.signedUrl,face:f.data.signedUrl});}catch(e:any){setAdminKycImageUrls({nin:'',face:''});setNotice(e?.message||'Could not securely open the KYC photos.');}};
+  const reviewKyc = async (decision:'approved'|'rejected') => {if(!isAdmin||!selectedAdminKyc||adminKycBusy)return;if(decision==='rejected'&&!adminKycNote.trim()){setNotice('Add a short reason before declining KYC.');return;}setAdminKycBusy(true);try{const uid=user.userId||user.id;const {data,error}=await supabase.from('kyc_submissions').update({status:decision,admin_note:adminKycNote.trim()||null,reviewed_by:uid,reviewed_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq('id',selectedAdminKyc.id).select('*').single();if(error)throw error;const title=decision==='approved'?'KYC approved — you can now list':'KYC needs an update';const body=decision==='approved'?'Your Calabar Connect City KYC has been approved. You can now publish marketplace listings.':'Your KYC was not approved yet. Open KYC to review the admin note and resubmit.';const {error:ne}=await supabase.from('notifications').insert({user_id:selectedAdminKyc.user_id,actor_id:uid,kind:decision==='approved'?'kyc_approved':'kyc_rejected',title,body,target_url:'kyc://status'});if(ne)throw ne;setAdminKycItems(items=>items.map(x=>x.id===data.id?data:x));setSelectedAdminKyc(data);setNotice(decision==='approved'?'KYC approved and the member has been notified.':'KYC declined and the member has been notified.');}catch(e:any){setNotice(e?.message||'Could not update the KYC decision.');}finally{setAdminKycBusy(false);}};
   return (
     <div className="app-shell">
       <header className="topbar">
