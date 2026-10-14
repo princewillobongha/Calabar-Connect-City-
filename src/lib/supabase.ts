@@ -202,6 +202,30 @@ async function get(path: string) {
     return {data:{items:rows.map((p:any)=>{const a:any=pm.get(p.author_id)||{};return {id:p.id,text:p.text,image_url:p.image_url||null,author:a.display_name||a.username||'Calabar Member',author_id:p.author_id,is_verified:!!a.is_verified&&(!a.verified_until||new Date(a.verified_until).getTime()>Date.now()),avatar_url:a.avatar_url||null,category:p.category,created_at:p.created_at,like_count:(likes||[]).filter((x:any)=>x.post_id===p.id).length,liked_by_me:!!viewer&&(likes||[]).some((x:any)=>x.post_id===p.id&&x.user_id===viewer.id),share_count:(shares||[]).filter((x:any)=>x.post_id===p.id).length,shared_by_me:!!viewer&&(shares||[]).some((x:any)=>x.post_id===p.id&&x.user_id===viewer.id),comment_count:0,view_count:Number(p.view_count||0),pinned_at:p.pinned_at||null}})}};
   }
   const user=await currentUser();
+  if (path === '/api/admin/support-threads') {
+    if ((user.email||'').toLowerCase() !== 'princewillobongha@gmail.com') fail('Admin access required.');
+    const {data,error}=await supabase.from('admin_support_messages').select('id,user_id,sender_id,sender_role,message,created_at').order('created_at',{ascending:false}).limit(1000);
+    const rows=ensure(data,error);
+    const latestByUser=new Map<string,any>();
+    for(const row of rows){if(!latestByUser.has(row.user_id))latestByUser.set(row.user_id,row);}
+    const ids=[...latestByUser.keys()];
+    const {data:profiles,error:profileError}=ids.length?await supabase.from('profiles').select('id,username,display_name,avatar_url').in('id',ids):{data:[],error:null};
+    if(profileError)fail(profileError.message);
+    const pm=new Map((profiles||[]).map((p:any)=>[p.id,p]));
+    return {data:{items:[...latestByUser.entries()].map(([userId,last]:any)=>({user_id:userId,last_message:last,profile:pm.get(userId)||{},waiting_for_admin:last.sender_role==='member'}).sort((a:any,b:any)=>Date.parse(b.last_message.created_at)-Date.parse(a.last_message.created_at)))}};
+  }
+  if (path === '/api/admin/support-messages/' || path.startsWith('/api/admin/support-messages/')) {
+    if ((user.email||'').toLowerCase() !== 'princewillobongha@gmail.com') fail('Admin access required.');
+    const targetId=path.slice('/api/admin/support-messages/'.length).split('?')[0];
+    if(!targetId)fail('Choose a member conversation.');
+    const {data,error}=await supabase.from('admin_support_messages').select('*').eq('user_id',targetId).order('created_at',{ascending:true}).limit(300);
+    return {data:{items:ensure(data,error)}};
+  }
+  if (path === '/api/support/messages') {
+    const {data,error}=await supabase.from('admin_support_messages').select('*').eq('user_id',user.id).order('created_at',{ascending:true}).limit(300);
+    const items=ensure(data,error);
+    return {data:{items,can_reply:items.length>0&&items[items.length-1].sender_role==='admin'}};
+  }
   if (path === '/api/friends') {
     const {data,error}=await supabase.from('friend_requests').select('*, sender:profiles!friend_requests_sender_id_fkey(display_name,username), receiver:profiles!friend_requests_receiver_id_fkey(display_name,username)').or('sender_id.eq.'+user.id+',receiver_id.eq.'+user.id).order('created_at',{ascending:false});
     return {data:{items:ensure(data,error).map((x:any)=>({id:x.id,from_id:x.sender_id,to_id:x.receiver_id,from_name:x.sender?.display_name||x.sender?.username||'Member',to_name:x.receiver?.display_name||x.receiver?.username||'Member',status:x.status,created_at:x.created_at}))}};
@@ -302,6 +326,27 @@ async function get(path: string) {
 async function post(path: string, body: any) {
   const user=await currentUser();
   const adminEmail=(user.email||'').toLowerCase()==='princewillobongha@gmail.com';
+  const adminSupportMatch=path.match(/^\/api\/admin\/support-messages\/([^/]+)$/);
+  if(adminSupportMatch){
+    if(!adminEmail)fail('Admin access required.');
+    const targetId=adminSupportMatch[1];
+    const message=String(body.message||'').trim();
+    if(!message)fail('Write a message before sending.');
+    if(message.length>4000)fail('Messages must be 4,000 characters or fewer.');
+    const {data,error}=await supabase.from('admin_support_messages').insert({user_id:targetId,sender_id:user.id,sender_role:'admin',message}).select('*').single();
+    const item=ensure(data,error);
+    const {error:noticeError}=await supabase.from('notifications').insert({user_id:targetId,actor_id:user.id,kind:'admin_message',title:'A message from Calabar Connect City admin',body:'You have a new private message from the Calabar Connect City admin.',target_url:'admin-message://'+targetId});
+    return {data:{item,notificationSent:!noticeError,notificationError:noticeError?.message||null}};
+  }
+  if(path==='/api/support/messages'){
+    if(adminEmail)fail('Use the admin dashboard to reply to members.');
+    const message=String(body.message||'').trim();
+    if(!message)fail('Write a message before sending.');
+    if(message.length>4000)fail('Messages must be 4,000 characters or fewer.');
+    const {data,error}=await supabase.from('admin_support_messages').insert({user_id:user.id,sender_id:user.id,sender_role:'member',message}).select('*').single();
+    const item=ensure(data,error);
+    return {data:{item,confirmation:'Your message has been sent. A Calabar Connect City admin will be with you shortly.'}};
+  }
   // Permanently delete a moderation report. This route is admin-only and
   // deliberately uses DELETE rather than a soft-delete/restore workflow.
   const reportDelete=path.match(/^\/api\/admin\/reports\/([^/]+)\/delete$/);
