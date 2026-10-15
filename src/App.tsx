@@ -866,7 +866,7 @@ export default function App() {
       setNotice('Could not load this area. Please try again.');
     }
   };
-  const nav = ['Discover', 'Marketplace', 'Community', 'Groups', 'Businesses', 'Jobs'];
+  const nav = ['Discover', 'Marketplace', 'Community', 'Groups', 'Businesses', 'Jobs', 'KYC'];
   const kycApproved = kycSubmission?.status === 'approved';
   const loadKycStatus = async () => {if(!user){setKycSubmission(null);return;}setKycLoading(true);try{const {data,error}=await supabase.from('kyc_submissions').select('*').eq('user_id',user.userId||user.id).maybeSingle();if(error)throw error;setKycSubmission(data||null);if(data?.status==='rejected')setKycForm((v:any)=>({...v,first_name:data.first_name||v.first_name,last_name:data.last_name||v.last_name,address:data.address||v.address,phone_number:data.phone_number||v.phone_number,date_of_birth:data.date_of_birth||v.date_of_birth,business_name:data.business_name||v.business_name,nin:data.nin||v.nin,location:data.location||v.location}));}catch(e:any){setNotice(e?.message||'Could not load your KYC status.');}finally{setKycLoading(false);}};
   const openKycGate = (action: string) => {
@@ -971,6 +971,7 @@ export default function App() {
               Users,
               Store,
               BriefcaseBusiness,
+              ShieldCheck,
             ][index] || Sparkles;
             return (
               <button
